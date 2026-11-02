@@ -34,18 +34,21 @@ async fn run() -> ExitCode {
     }
     if args == ["--help"] {
         println!(
-            "{}: want-garde-daemon [--lang LOCALE] [--check-config | --delivery-status] --config PATH",
+            "{}: want-garde-daemon [--lang LOCALE] [--check-config | --delivery-status | --ssh-status] --config PATH",
             message(locale, "usage")
         );
         return ExitCode::SUCCESS;
     }
-    let (check, diagnostic, path) = match args {
-        [flag, path] if flag == "--config" => (false, false, path),
+    let (check, diagnostic, ssh_diagnostic, path) = match args {
+        [flag, path] if flag == "--config" => (false, false, false, path),
         [check, flag, path] if check == "--check-config" && flag == "--config" => {
-            (true, false, path)
+            (true, false, false, path)
         }
         [diagnostic, flag, path] if diagnostic == "--delivery-status" && flag == "--config" => {
-            (false, true, path)
+            (false, true, false, path)
+        }
+        [diagnostic, flag, path] if diagnostic == "--ssh-status" && flag == "--config" => {
+            (false, false, true, path)
         }
         _ => {
             eprintln!("request.invalid: {}", message(locale, "operation_failed"));
@@ -53,14 +56,14 @@ async fn run() -> ExitCode {
         }
     };
     let config = match Config::load(Path::new(path)).and_then(|c| {
-        if !diagnostic {
+        if !diagnostic && !ssh_diagnostic {
             c.validate_runtime()?;
         }
         Ok(c)
     }) {
         Ok(config) => config,
         Err(code) => {
-            if diagnostic {
+            if diagnostic || ssh_diagnostic {
                 return diagnostic_error(code);
             }
             eprintln!("{code}: {}", message(locale, "operation_failed"));
@@ -69,6 +72,28 @@ async fn run() -> ExitCode {
     };
     if !explicit_locale {
         locale = &config.default_locale;
+    }
+    if ssh_diagnostic {
+        return match garde_daemon::delivery::Store::inspect_ssh(
+            &config,
+            garde_daemon::runtime::now(),
+        ) {
+            Ok(health) => {
+                let healthy = health.state == garde_contracts::SshStatus::Healthy;
+                match serde_json::to_string(&health) {
+                    Ok(json) => {
+                        println!("{json}");
+                        if healthy {
+                            ExitCode::SUCCESS
+                        } else {
+                            ExitCode::from(1)
+                        }
+                    }
+                    Err(_) => diagnostic_error("ssh.state"),
+                }
+            }
+            Err(code) => diagnostic_error(code),
+        };
     }
     if diagnostic {
         return match config.owner().and_then(|owner| {

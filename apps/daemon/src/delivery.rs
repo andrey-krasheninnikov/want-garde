@@ -197,6 +197,14 @@ impl Store {
                 return Err("storage.corrupt");
             }
         }
+        let saved: Option<String> = sql(connection
+            .query_row("SELECT value FROM meta WHERE key='ssh.state'", [], |r| {
+                r.get(0)
+            })
+            .optional())?;
+        if let Some(saved) = saved {
+            crate::ssh::State::decode(&saved)?;
+        }
         sql(connection.execute("UPDATE deliveries SET state='pending',uncertain=1,last_error='delivery.uncertain' WHERE state='in_flight'",[]))?;
         Ok(Self {
             connection,
@@ -326,7 +334,13 @@ impl Store {
         now: i64,
         checkpoint: Option<&str>,
     ) -> Result<()> {
+        if let Some(checkpoint) = checkpoint {
+            crate::ssh::State::decode(checkpoint)?;
+        }
         let Some(event) = event else {
+            if checkpoint.is_some() {
+                self.admit(0, now)?;
+            }
             let transaction = sql(self.connection.transaction())?;
             if let Some(checkpoint) = checkpoint {
                 sql(transaction.execute("INSERT INTO meta VALUES('ssh.state',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",[checkpoint]))?;
@@ -490,31 +504,72 @@ impl Store {
         owner: &str,
         now: i64,
     ) -> Result<DeliveryHealth> {
-        self::directory(directory)?;
-        let path = directory
-            .canonicalize()
-            .map_err(|_| "storage.permissions")?
-            .join("garde.sqlite3");
-        private_file(&path)?;
-        let connection = sql(Connection::open_with_flags(
-            path,
-            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
-        ))?;
-        sql(connection.busy_timeout(Duration::from_millis(250)))?;
-        let version: i64 = sql(connection.query_row("PRAGMA user_version", [], |r| r.get(0)))?;
-        if version != 1 {
-            return Err("storage.version");
-        }
-        for (key, value) in [("server", server), ("owner", owner)] {
-            let saved: String =
-                sql(connection
-                    .query_row("SELECT value FROM meta WHERE key=?1", [key], |r| r.get(0)))?;
-            if saved != value {
-                return Err("storage.identity");
-            }
-        }
-        health(&connection, now)
+        health(&inspect_connection(directory, server, owner)?, now)
     }
+
+    pub fn ssh_health(
+        &self,
+        config: &garde_config::Config,
+        now: i64,
+    ) -> Result<garde_contracts::SshHealth> {
+        ssh_health(&self.connection, config, now)
+    }
+    pub fn inspect_ssh(
+        config: &garde_config::Config,
+        now: i64,
+    ) -> Result<garde_contracts::SshHealth> {
+        ssh_health(
+            &inspect_connection(
+                &config.state_dir,
+                config.server_id.as_str(),
+                config.owner()?,
+            )?,
+            config,
+            now,
+        )
+    }
+}
+
+fn inspect_connection(directory: &Path, server: &str, owner: &str) -> Result<Connection> {
+    self::directory(directory)?;
+    let path = directory
+        .canonicalize()
+        .map_err(|_| "storage.permissions")?
+        .join("garde.sqlite3");
+    private_file(&path)?;
+    let connection = sql(Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    ))?;
+    sql(connection.busy_timeout(Duration::from_millis(250)))?;
+    let version: i64 = sql(connection.query_row("PRAGMA user_version", [], |r| r.get(0)))?;
+    if version != 1 {
+        return Err("storage.version");
+    }
+    for (key, value) in [("server", server), ("owner", owner)] {
+        let saved: String =
+            sql(connection.query_row("SELECT value FROM meta WHERE key=?1", [key], |r| r.get(0)))?;
+        if saved != value {
+            return Err("storage.identity");
+        }
+    }
+    Ok(connection)
+}
+fn ssh_health(
+    connection: &Connection,
+    config: &garde_config::Config,
+    now: i64,
+) -> Result<garde_contracts::SshHealth> {
+    let saved: Option<String> = sql(connection
+        .query_row("SELECT value FROM meta WHERE key='ssh.state'", [], |r| {
+            r.get(0)
+        })
+        .optional())?;
+    let state = saved
+        .map(|s| crate::ssh::State::decode(&s))
+        .transpose()?
+        .unwrap_or_else(|| crate::ssh::State::new(config));
+    Ok(state.health(&config.server_id, now))
 }
 
 fn timestamp(value: i64) -> Result<DateTime<Utc>> {

@@ -5,6 +5,7 @@ import type {
   HostSnapshot,
   OperationResult,
   DeliveryHealth,
+  SshHealth,
 } from "../generated/index";
 import { CONTRACT_VERSION } from "../generated/index";
 
@@ -65,3 +66,23 @@ const delivery: DeliveryHealth = {
 // @ts-expect-error A delivery state must use the documented vocabulary.
 const invalidDelivery: DeliveryHealth["problems"][number]["state"] = "lost";
 void [delivery, invalidDelivery];
+
+const ssh: SshHealth = {
+  version: "1",
+  server_id: "server-demo",
+  observed_at: "2026-11-03T00:00:00Z",
+  source: "journald",
+  state: "degraded",
+  reason_key: null,
+  file_path: null,
+  coverage_started_at: "2026-11-01T00:00:00Z",
+  checked_at: "2026-11-03T00:00:00Z",
+  last_record_at: "2026-11-02T23:59:00Z",
+  skipped_records: 1,
+  gap_count: 1,
+  last_gap: "ssh.cursor_missing",
+  last_gap_at: "2026-11-02T23:58:00Z",
+};
+// @ts-expect-error Source health uses explicit coverage states.
+const invalidSsh: SshHealth["state"] = "complete";
+void [ssh, invalidSsh];

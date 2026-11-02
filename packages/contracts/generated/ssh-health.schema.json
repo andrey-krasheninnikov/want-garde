@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SshHealth",
+  "type": "object",
+  "properties": {
+    "checked_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "coverage_started_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "file_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "gap_count": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "last_gap": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "last_gap_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "last_record_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "reason_key": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "server_id": {
+      "$ref": "#/$defs/Id"
+    },
+    "skipped_records": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "source": {
+      "$ref": "#/$defs/SshSourceKind"
+    },
+    "state": {
+      "$ref": "#/$defs/SshStatus"
+    },
+    "version": {
+      "$ref": "#/$defs/WireVersion"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "server_id",
+    "observed_at",
+    "source",
+    "state",
+    "skipped_records",
+    "gap_count"
+  ],
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "SshSourceKind": {
+      "type": "string",
+      "enum": [
+        "unselected",
+        "journald",
+        "file"
+      ]
+    },
+    "SshStatus": {
+      "type": "string",
+      "enum": [
+        "starting",
+        "healthy",
+        "degraded",
+        "unavailable"
+      ]
+    },
+    "WireVersion": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    }
+  }
+}
