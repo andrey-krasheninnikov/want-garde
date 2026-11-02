@@ -2,7 +2,7 @@
 
 ## Русский
 
-Первый сервис обслуживает один Linux VPS и отдельный Telegram bot token через HTTPS polling. В личном чате владельцу доступны `/start`, `/help`, `/status` и `/language`. Неизвестные пользователи, группы, callbacks и edited messages не получают состояние. Первичная привязка выполняется локально; username и статус администратора группы не дают доступа.
+Сервис обслуживает один Linux VPS и отдельный Telegram bot token через HTTPS polling. В личном чате владельцу доступны `/start`, `/help`, `/status`, `/delivery` и `/language`. Неизвестные пользователи, группы, callbacks и edited messages не получают состояние. Первичная привязка выполняется локально; username и статус администратора группы не дают доступа.
 
 ### Подготовка
 
@@ -60,13 +60,13 @@ sudo systemctl restart want-garde.service
 
 Сервис работает без root, capabilities, sudo и Docker socket. Токен/config читаются, состояние доступно только service user. SIGTERM/SIGINT прерывают polling и ожидание backoff. Код 2 обозначает отказ конфигурации, identity или постоянную ошибку запуска; systemd не повторяет такой запуск автоматически. После аварийного завершения CLI проверьте отсутствие живой команды перед ручным удалением оставшегося `config.lock`.
 
-Сетевые ошибки polling повторяются с backoff 1..30 s; Telegram retry_after ограничен 1..3600 s. Ошибки токена, webhook и конфликт polling останавливают процесс. Ответы `/status` пока best effort: неоднозначная отправка не повторяется, offset хранится в памяти. После рестарта возможны повторные ответы на старые updates; команда может не получить ответ при сбое доставки. Сохраняемые offsets/outbox и гарантии доставки относятся к #4.
+Сетевые ошибки polling повторяются с backoff 1..30 s с учётом Telegram retry_after. Ошибки токена, webhook и конфликт polling останавливают процесс. События, ответы и polling offset сохраняются в SQLite до отправки. Неоднозначная отправка может повториться с тем же ID. Срок доставки события: 24 часа; ответа: 10 минут. См. [доставку, диагностику и ограничения](delivery.md).
 
 Для отката первой неуспешной установки остановите и отключите только `want-garde.service`; сохраните конфигурацию и токен для исправления. При последующих ручных обновлениях сначала сохраните предыдущий SHA и файлы, остановите сервис, переключите `current` на проверенную сборку и проверьте запуск. Совместимость будущих данных и автоматический rollback требуют отдельных тикетов. Не запускайте helper или MCP: в #3 они остаются каркасом.
 
 ## English
 
-The first service runs on one Linux VPS with a dedicated Telegram bot token and HTTPS polling. The owner can use `/start`, `/help`, `/status`, and `/language` in a private chat. Unknown users, groups, callbacks, and edited messages receive no host status. Initial binding is local; usernames and group-administrator status grant no access.
+The service runs on one Linux VPS with a dedicated Telegram bot token and HTTPS polling. The owner can use `/start`, `/help`, `/status`, `/delivery`, and `/language` in a private chat. Unknown users, groups, callbacks, and edited messages receive no host status. Initial binding is local; usernames and group-administrator status grant no access.
 
 ### Preparation
 
@@ -86,6 +86,6 @@ Use the systemctl and journalctl commands above to inspect, stop, start, and res
 
 The daemon has no root, capabilities, sudo, or Docker-socket access. Configuration/token files are read only; state is private to the service user. SIGTERM/SIGINT interrupt polling and backoff. Exit code 2 means invalid configuration/identity or a permanent startup failure; systemd does not restart it automatically. If a terminated CLI leaves `config.lock`, confirm that no binding command is running before removing that lock manually.
 
-Polling network failures use a 1..30-second backoff; Telegram retry_after is bounded to 1..3600 seconds. Invalid tokens, webhooks, and polling conflicts stop the process. Status replies are currently best effort: ambiguous sends are not retried and offsets remain in memory. Restart can repeat replies to old updates, and a delivery failure can leave a command unanswered. Durable offsets/outbox and delivery guarantees belong to #4.
+Polling network failures use a 1..30-second backoff and respect Telegram retry_after. Invalid tokens, webhooks, and polling conflicts stop the process. Events, replies, and polling progress are persisted in SQLite before sending. An ambiguous send can repeat with the same ID. Events expire after 24 hours; replies after 10 minutes. See [delivery, diagnostics, and limitations](delivery.md).
 
 To roll back a failed first installation, stop and disable only `want-garde.service`, retaining configuration and token for correction. Before later manual updates, preserve the previous SHA/files, stop the service, switch `current` to a verified build, and check startup. Future data compatibility and automatic rollback require their implementation issues. Helper and MCP remain scaffolds in #3.

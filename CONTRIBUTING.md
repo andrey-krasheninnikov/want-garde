@@ -47,9 +47,9 @@ npm run build
 git diff --check
 ```
 
-Export contract changes explicitly with cargo xtask contracts. Tests and --check never update tracked artifacts. Use focused integration-test files while developing; run the full applicable suite once before publication. Contract decoding and tooling are the #2 TDD seams. SQLite/policy-to-delivery behavior and Linux VM effects arrive with their implementation tickets.
+Export contract changes explicitly with cargo xtask contracts. Tests and --check never update tracked artifacts. Use focused integration-test files while developing; run the full applicable suite once before publication. Contract decoding and tooling are the #2 TDD seams. #4 tests events/commands through real temporary SQLite and a fake Telegram transport, plus process diagnostics and storage failures. Linux systemd effects require separate runtime evidence.
 
-Изменения контрактов экспортируются явно через cargo xtask contracts. Tests и --check не обновляют отслеживаемые артефакты. При разработке запускайте отдельные integration-test files; перед публикацией выполните полный применимый набор один раз. Seams TDD в #2: декодирование контрактов и tooling. Поведение SQLite/policy-to-delivery и Linux VM effects проверяются в соответствующих implementation tickets.
+Изменения контрактов экспортируются явно через cargo xtask contracts. Tests и --check не обновляют отслеживаемые артефакты. При разработке запускайте отдельные integration-test files; перед публикацией выполните полный применимый набор один раз. Seams TDD в #2: декодирование контрактов и tooling. В #4 события/команды проходят настоящий временный SQLite и подменённый Telegram transport; проверяются также процесс диагностики и отказы хранилища. Эффекты Linux systemd требуют отдельных runtime-проверок.
 
 For local previews, run npm run dev:tma or npm run dev:landing. Servers bind to 127.0.0.1. These screens are development scaffolds without Telegram authentication or server access. Stop only the preview processes started for your task.
 
