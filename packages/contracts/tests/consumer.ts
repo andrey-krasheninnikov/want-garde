@@ -4,6 +4,7 @@ import type {
   Job,
   HostSnapshot,
   OperationResult,
+  DeliveryHealth,
 } from "../generated/index";
 import { CONTRACT_VERSION } from "../generated/index";
 
@@ -47,3 +48,20 @@ const result: OperationResult = {
 // @ts-expect-error Unavailable measurements cannot contain a guessed zero.
 const invalid: HostSnapshot["uptime_seconds"] = { type: "unavailable", value: 0 };
 void [result, invalid];
+
+const delivery: DeliveryHealth = {
+  version: CONTRACT_VERSION,
+  server_id: "server-demo",
+  observed_at: "2026-01-01T00:01:00Z",
+  pending: 1,
+  in_flight: 0,
+  delivered: 0,
+  dead_letter: 0,
+  rate_limited: 0,
+  oldest_pending_at: "2026-01-01T00:00:00Z",
+  pruned_records: 0,
+  problems: [],
+};
+// @ts-expect-error A delivery state must use the documented vocabulary.
+const invalidDelivery: DeliveryHealth["problems"][number]["state"] = "lost";
+void [delivery, invalidDelivery];

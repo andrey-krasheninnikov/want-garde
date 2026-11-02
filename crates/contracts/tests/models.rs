@@ -1,4 +1,4 @@
-use garde_contracts::{Event, Grant, Incident, Job};
+use garde_contracts::{DeliveryHealth, Event, Grant, Incident, Job};
 use serde::{Serialize, de::DeserializeOwned};
 
 fn roundtrip<T: DeserializeOwned + Serialize>(input: &str) {
@@ -13,6 +13,9 @@ fn shared_observations_permissions_and_results_preserve_the_wire_examples() {
     roundtrip::<Incident>(include_str!("../../../fixtures/contracts/incident.json"));
     roundtrip::<Grant>(include_str!("../../../fixtures/contracts/grant.json"));
     roundtrip::<Job>(include_str!("../../../fixtures/contracts/job.json"));
+    roundtrip::<DeliveryHealth>(include_str!(
+        "../../../fixtures/contracts/delivery-health.json"
+    ));
 }
 
 #[test]
