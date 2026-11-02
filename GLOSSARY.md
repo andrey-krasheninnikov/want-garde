@@ -89,3 +89,7 @@ _Avoid_: Event / Событие, когда речь об отправке со�
 **Host snapshot / Снимок хоста**
 
 Состояние одной установки на момент измерения, включающее доступные показатели и явные сведения о недоступных показателях. / The state of one installation at a measurement time, including available measurements and explicit information about unavailable measurements.
+
+**Coverage gap / Пропуск наблюдения**
+
+Интервал, для которого установка не может подтвердить полноту собранных наблюдений. Восстановление доступности источника не устраняет уже возникший пропуск. / An interval for which the installation cannot establish complete observation coverage. Restoring source availability does not erase an earlier gap.
