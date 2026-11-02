@@ -24,6 +24,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version-file: .node-version
@@ -56,3 +57,23 @@ jobs:
           npm run build
       - name: Clean tracked state
         run: git diff --exit-code
+      - name: Package development installation
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          mkdir -p target/installation
+          install -m 755 target/release/want-garde target/release/want-garde-daemon target/installation/
+          cp packaging/systemd/want-garde.service examples/config.json target/installation/
+          printf '%s\n' "$SOURCE_SHA" > target/installation/revision
+          (cd target/installation && sha256sum want-garde want-garde-daemon want-garde.service config.json revision > SHA256SUMS)
+          tar -czf target/want-garde-linux-x86_64.tar.gz -C target/installation .
+          (cd target && sha256sum want-garde-linux-x86_64.tar.gz > want-garde-linux-x86_64.tar.gz.sha256)
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-x86_64-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            target/want-garde-linux-x86_64.tar.gz
+            target/want-garde-linux-x86_64.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 3
