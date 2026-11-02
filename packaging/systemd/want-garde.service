@@ -9,7 +9,6 @@ StartLimitBurst=3
 Type=simple
 User=want-garde
 Group=want-garde
-ExecStartPre=/usr/local/lib/want-garde/current/want-garde-daemon --check-config --config /etc/want-garde/config.json
 ExecStart=/usr/local/lib/want-garde/current/want-garde-daemon --config /etc/want-garde/config.json
 Restart=on-failure
 RestartPreventExitStatus=2

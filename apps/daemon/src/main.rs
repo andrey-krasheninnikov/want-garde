@@ -10,8 +10,11 @@ async fn shutdown() -> Result<(), &'static str> {
     Ok(())
 }
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> ExitCode {
+fn main() -> ExitCode {
+    garde_daemon::run_process(run())
+}
+
+async fn run() -> ExitCode {
     let Ok(args) = std::env::args_os()
         .skip(1)
         .map(|s| s.into_string())

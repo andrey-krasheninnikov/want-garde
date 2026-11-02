@@ -278,3 +278,20 @@ pub async fn serve(config: Config) -> Result<()> {
         }
     }
 }
+
+pub fn run_process(work: impl Future<Output = std::process::ExitCode>) -> std::process::ExitCode {
+    let runtime = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime,
+        Err(_) => {
+            eprintln!("service.runtime");
+            return std::process::ExitCode::from(2);
+        }
+    };
+    let result = runtime.block_on(work);
+    // Native DNS workers cannot be cancelled; they must not hold process shutdown.
+    runtime.shutdown_timeout(std::time::Duration::from_secs(1));
+    result
+}
