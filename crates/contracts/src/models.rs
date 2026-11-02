@@ -44,7 +44,8 @@ pub struct Event {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum IncidentState {
-    Open,
+    // Empty struct variants enforce unknown-field rejection; Serde unit variants do not.
+    Open {},
     Acknowledged {
         by: Id,
         at: DateTime<Utc>,
@@ -106,13 +107,13 @@ pub enum OperationResult {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum JobState {
-    AwaitingApproval,
-    Queued,
-    Running,
+    AwaitingApproval {},
+    Queued {},
+    Running {},
     Succeeded { result: OperationResult },
     Failed { error: ContractError },
-    Cancelled,
-    TimedOut,
+    Cancelled {},
+    TimedOut {},
     NeedsReconciliation { reason_key: Id },
 }
 

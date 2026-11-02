@@ -1,0 +1,87 @@
+[
+  {
+    "schema": "job",
+    "case": "awaiting_approval rejects extra state fields",
+    "value": {
+      "version": "1",
+      "id": "job-001",
+      "request_id": "request-001",
+      "server_id": "server-demo",
+      "state": {
+        "type": "awaiting_approval",
+        "unexpected": true
+      }
+    }
+  },
+  {
+    "schema": "job",
+    "case": "queued rejects extra state fields",
+    "value": {
+      "version": "1",
+      "id": "job-001",
+      "request_id": "request-001",
+      "server_id": "server-demo",
+      "state": {
+        "type": "queued",
+        "unexpected": true
+      }
+    }
+  },
+  {
+    "schema": "job",
+    "case": "running rejects extra state fields",
+    "value": {
+      "version": "1",
+      "id": "job-001",
+      "request_id": "request-001",
+      "server_id": "server-demo",
+      "state": {
+        "type": "running",
+        "unexpected": true
+      }
+    }
+  },
+  {
+    "schema": "job",
+    "case": "cancelled rejects extra state fields",
+    "value": {
+      "version": "1",
+      "id": "job-001",
+      "request_id": "request-001",
+      "server_id": "server-demo",
+      "state": {
+        "type": "cancelled",
+        "unexpected": true
+      }
+    }
+  },
+  {
+    "schema": "job",
+    "case": "timed_out rejects extra state fields",
+    "value": {
+      "version": "1",
+      "id": "job-001",
+      "request_id": "request-001",
+      "server_id": "server-demo",
+      "state": {
+        "type": "timed_out",
+        "unexpected": true
+      }
+    }
+  },
+  {
+    "schema": "incident",
+    "case": "open rejects extra state fields",
+    "value": {
+      "version": "1",
+      "id": "incident-001",
+      "server_id": "server-demo",
+      "event_ids": ["event-001"],
+      "severity": "warning",
+      "state": {
+        "type": "open",
+        "unexpected": true
+      }
+    }
+  }
+]

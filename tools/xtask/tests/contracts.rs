@@ -91,3 +91,28 @@ fn schemas_match_valid_examples_and_reject_the_negative_request_corpus() {
         );
     }
 }
+
+#[test]
+fn schemas_reject_extra_state_fields_and_accept_payload_free_states() {
+    let directory = tempfile::tempdir().unwrap();
+    assert!(tool(directory.path(), false).status.success());
+    let cases: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../fixtures/contracts/invalid-states.json"
+    ))
+    .unwrap();
+    for case in cases.as_array().unwrap() {
+        let name = case["schema"].as_str().unwrap();
+        let schema: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(directory.path().join(format!("{name}.schema.json"))).unwrap(),
+        )
+        .unwrap();
+        assert!(
+            !jsonschema::is_valid(&schema, &case["value"]),
+            "{}",
+            case["case"]
+        );
+        let mut valid = case["value"].clone();
+        valid["state"].as_object_mut().unwrap().remove("unexpected");
+        assert!(jsonschema::is_valid(&schema, &valid), "{}", case["case"]);
+    }
+}
