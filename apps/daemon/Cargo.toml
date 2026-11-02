@@ -16,10 +16,11 @@ garde-contracts.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 chrono.workspace = true
-tokio = { version = "1.54", features = ["rt", "macros", "time", "signal"] }
+tokio = { version = "1.54", features = ["rt", "macros", "time", "signal", "sync"] }
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
 rustix = { version = "1.1", features = ["fs", "process"] }
 garde-entrypoint = { path = "../../crates/entrypoint" }
+rusqlite = { version = "0.41.1", features = ["bundled"] }
 
 [lints]
 workspace = true

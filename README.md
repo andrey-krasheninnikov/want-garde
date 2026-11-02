@@ -8,7 +8,7 @@
 
 Want Garde: открытый self-hosted продукт для мониторинга состояния и безопасности VPS и управления сервером через Telegram. Каждая установка использует собственного бота и не зависит от центрального управляющего сервиса.
 
-**Статус: первый Rust-сервис.** Доступны приватный `/status`, локальная привязка владельца, 12 языков и [ручная установка через systemd](docs/installation.md). Полный мониторинг, надёжная очередь, управление, bootstrap, TMA и лендинг реализуются следующими тикетами. Публичного релиза пока нет.
+**Статус: Rust-сервис с сохраняемой доставкой.** Доступны приватные `/status` и `/delivery`, SQLite/outbox, локальная привязка владельца, 12 языков и [ручная установка через systemd](docs/installation.md). [Доставка и восстановление](docs/delivery.md) описывают сроки, ограничения и диагностику. Полный мониторинг, управление, bootstrap, TMA и лендинг реализуются следующими тикетами. Публичного релиза пока нет.
 
 [Спецификация](https://github.com/andrey-krasheninnikov/want-garde/issues/1) · [Тикеты](https://github.com/andrey-krasheninnikov/want-garde/issues)
 
@@ -41,7 +41,7 @@ Want Garde: открытый self-hosted продукт для монитори�
 
 Want Garde is an open-source self-hosted product for VPS health and security monitoring and server management through Telegram. Each installation uses its own bot and does not depend on a central control service.
 
-**Status: the first Rust service.** Private `/status`, local owner binding, 12 languages, and [manual systemd installation](docs/installation.md) are available. Full monitoring, durable delivery, administration, bootstrap, TMA, and the landing page follow in later issues. There is no public release yet.
+**Status: Rust service with durable delivery.** Private `/status` and `/delivery`, SQLite/outbox, local owner binding, 12 languages, and [manual systemd installation](docs/installation.md) are available. [Delivery and recovery](docs/delivery.md) describe deadlines, limits, and diagnostics. Full monitoring, administration, bootstrap, TMA, and the landing page follow in later issues. There is no public release yet.
 
 [Specification](https://github.com/andrey-krasheninnikov/want-garde/issues/1) · [Tickets](https://github.com/andrey-krasheninnikov/want-garde/issues)
 

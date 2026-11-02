@@ -21,7 +21,7 @@ State/result являются discriminated unions. Success содержит т�
 
 Перед новой функцией добавьте её typed action/result и необходимые capabilities. Изменения текущих строгих DTO требуют анализа совместимости и явного решения о wire version. Старый reader не обязан принимать новые поля. TypeScript помогает при компиляции, но не проверяет сетевые данные во время исполнения; сервер всегда декодирует и проверяет ввод.
 
-Положительные и отрицательные примеры в fixtures/contracts являются синтетическими. Проверки сериализации, JSON Schema и TypeScript используют публичные контракты. Первичная авторизация, TOTP, SQLite, jobs persistence и транспортные adapters реализуются в следующих тикетах.
+Положительные и отрицательные примеры в fixtures/contracts являются синтетическими. Проверки сериализации, JSON Schema и TypeScript используют публичные контракты. Приватный доступ владельца, SQLite событий/outbox и Telegram transport реализованы в #3/#4; TOTP и jobs persistence следуют в профильных тикетах.
 
 ## English
 
@@ -44,7 +44,7 @@ State/result are discriminated unions. Success carries a typed result; failure c
 
 Before adding a feature, add its typed action/result and capabilities. Changes to the current strict DTOs require compatibility analysis and an explicit wire-version decision. Old readers need not accept new fields. TypeScript provides compile-time help, not network-data validation; the server always decodes and validates input.
 
-Fixtures in fixtures/contracts are synthetic. Serialization, JSON Schema, and TypeScript checks use public contracts. Initial authorization, TOTP, SQLite, job persistence, and transport adapters arrive in later tickets.
+Fixtures in fixtures/contracts are synthetic. Serialization, JSON Schema, and TypeScript checks use public contracts. Private owner access, SQLite events/outbox, and Telegram transport are implemented in #3/#4; TOTP and job persistence follow in their feature issues.
 
 ## Host snapshot / Снимок хоста
 
@@ -55,3 +55,9 @@ The server_status result contains server_id, product_version, and a timestamped 
 By explicit pre-release decision, this extends wire version "1" without a version bump. Old strict scaffold readers cannot decode the new status result. Update Rust, JSON Schema, TypeScript, fixtures, and consumers together; compatibility with the earlier unpublished scaffold is not promised.
 
 По согласованному решению до первого релиза wire version "1" развивается без смены номера. Старые строгие readers каркаса не прочитают новый результат статуса. Rust, JSON Schema, TypeScript, fixtures и потребители обновляются вместе; совместимость с прежним невыпущенным каркасом не обещается.
+
+## Delivery diagnostics / Диагностика доставки
+
+DeliveryHealth is a separate additive wire-version "1" DTO. It contains queue counts, oldest pending time, rate-limited recipient count, pruning count, and up to 20 DeliveryProblem entries. Problems carry stable string IDs, delivery state, attempt count, reason_key, uncertainty, and update time. Message contents, recipient IDs, and tokens are excluded. The daemon enforces response bounds; generated types provide no authorization. The existing server.status action and result are unchanged.
+
+DeliveryHealth добавлен отдельным DTO wire version "1". Он содержит счётчики очереди, время самой старой ожидающей доставки, число получателей на паузе, счётчик очистки и до 20 записей DeliveryProblem. Проблемы содержат стабильные строковые ID, состояние доставки, число попыток, reason_key, признак неоднозначности и время изменения. Тексты сообщений, ID получателей и токены исключены. Daemon ограничивает размер результата; производные типы не дают полномочий. Действие server.status и его результат сохраняют прежний формат.

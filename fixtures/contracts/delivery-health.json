@@ -1,0 +1,23 @@
+{
+  "version": "1",
+  "server_id": "server-demo",
+  "observed_at": "2026-01-01T00:01:00Z",
+  "pending": 1,
+  "in_flight": 0,
+  "delivered": 2,
+  "dead_letter": 1,
+  "rate_limited": 0,
+  "oldest_pending_at": "2026-01-01T00:00:00Z",
+  "pruned_records": 0,
+  "problems": [
+    {
+      "delivery_id": "d-3",
+      "event_id": "event-001",
+      "state": "dead_letter",
+      "attempts": 1,
+      "reason_key": "telegram.forbidden",
+      "uncertain": false,
+      "updated_at": "2026-01-01T00:00:30Z"
+    }
+  ]
+}

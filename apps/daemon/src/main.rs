@@ -34,31 +34,70 @@ async fn run() -> ExitCode {
     }
     if args == ["--help"] {
         println!(
-            "{}: want-garde-daemon [--lang LOCALE] [--check-config] --config PATH",
+            "{}: want-garde-daemon [--lang LOCALE] [--check-config | --delivery-status] --config PATH",
             message(locale, "usage")
         );
         return ExitCode::SUCCESS;
     }
-    let (check, path) = match args {
-        [flag, path] if flag == "--config" => (false, path),
-        [check, flag, path] if check == "--check-config" && flag == "--config" => (true, path),
+    let (check, diagnostic, path) = match args {
+        [flag, path] if flag == "--config" => (false, false, path),
+        [check, flag, path] if check == "--check-config" && flag == "--config" => {
+            (true, false, path)
+        }
+        [diagnostic, flag, path] if diagnostic == "--delivery-status" && flag == "--config" => {
+            (false, true, path)
+        }
         _ => {
             eprintln!("request.invalid: {}", message(locale, "operation_failed"));
             return ExitCode::from(2);
         }
     };
     let config = match Config::load(Path::new(path)).and_then(|c| {
-        c.validate_runtime()?;
+        if !diagnostic {
+            c.validate_runtime()?;
+        }
         Ok(c)
     }) {
         Ok(config) => config,
         Err(code) => {
+            if diagnostic {
+                return diagnostic_error(code);
+            }
             eprintln!("{code}: {}", message(locale, "operation_failed"));
             return ExitCode::from(2);
         }
     };
     if !explicit_locale {
         locale = &config.default_locale;
+    }
+    if diagnostic {
+        return match config.owner().and_then(|owner| {
+            garde_daemon::delivery::Store::inspect(
+                &config.state_dir,
+                config.server_id.as_str(),
+                owner,
+                garde_daemon::runtime::now(),
+            )
+        }) {
+            Ok(health) => {
+                let degraded = health.dead_letter > 0
+                    || health.oldest_pending_at.is_some_and(|at| {
+                        garde_daemon::runtime::now().saturating_sub(at.timestamp()) >= 60
+                    });
+                match serde_json::to_string(&health) {
+                    Ok(json) => {
+                        println!("{json}");
+                        if degraded {
+                            ExitCode::from(1)
+                        } else {
+                            ExitCode::SUCCESS
+                        }
+                    }
+                    Err(_) => diagnostic_error("storage.failed"),
+                }
+            }
+            Err(code) => diagnostic_error(code),
+        };
     }
     let initial = match garde_daemon::Bot::new(config.clone()) {
         Ok(bot) => bot,
@@ -92,4 +131,12 @@ async fn run() -> ExitCode {
             ExitCode::from(2)
         }
     }
+}
+
+fn diagnostic_error(code: &str) -> ExitCode {
+    println!(
+        "{}",
+        serde_json::json!({"version":"1","error":{"code":"unavailable","message_key":code}})
+    );
+    ExitCode::from(2)
 }

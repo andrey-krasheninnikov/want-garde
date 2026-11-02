@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DeliveryHealth",
+  "type": "object",
+  "properties": {
+    "dead_letter": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "delivered": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "in_flight": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "oldest_pending_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "pending": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "problems": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/DeliveryProblem"
+      }
+    },
+    "pruned_records": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "rate_limited": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "server_id": {
+      "$ref": "#/$defs/Id"
+    },
+    "version": {
+      "$ref": "#/$defs/WireVersion"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "server_id",
+    "observed_at",
+    "pending",
+    "in_flight",
+    "delivered",
+    "dead_letter",
+    "rate_limited",
+    "pruned_records",
+    "problems"
+  ],
+  "$defs": {
+    "DeliveryProblem": {
+      "type": "object",
+      "properties": {
+        "attempts": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "delivery_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "event_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason_key": {
+          "$ref": "#/$defs/Id"
+        },
+        "state": {
+          "$ref": "#/$defs/DeliveryState"
+        },
+        "uncertain": {
+          "type": "boolean"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "delivery_id",
+        "state",
+        "attempts",
+        "reason_key",
+        "uncertain",
+        "updated_at"
+      ]
+    },
+    "DeliveryState": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "in_flight",
+        "delivered",
+        "dead_letter"
+      ]
+    },
+    "Id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "WireVersion": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    }
+  }
+}

@@ -2,13 +2,13 @@
 
 ## Русский
 
-Первый сервис обслуживает один Linux VPS и отдельный Telegram bot token через HTTPS polling. В личном чате владельцу доступны `/start`, `/help`, `/status` и `/language`. Неизвестные пользователи, группы, callbacks и edited messages не получают состояние. Первичная привязка выполняется локально; username и статус администратора группы не дают доступа.
+Сервис обслуживает один Linux VPS и отдельный Telegram bot token через HTTPS polling. В личном чате владельцу доступны `/start`, `/help`, `/status`, `/delivery` и `/language`. Неизвестные пользователи, группы, callbacks и edited messages не получают состояние. Первичная привязка выполняется локально; username и статус администратора группы не дают доступа.
 
 ### Подготовка
 
 Нужны systemd, исходящая HTTPS-связь с api.telegram.org и отдельный bot token. Webhook должен отсутствовать; сервис не удаляет его автоматически. Не запускайте другой polling-процесс с тем же токеном. Конфигурация проверяется до сети. Proxy-конфигурация относится к #14; текущий transport не использует proxy-переменные окружения и не меняет маршрут ОС.
 
-CI создаёт development artifact `linux-x86_64-<commit>` из точного SHA исходников. Это сборка Ubuntu 24.04 x86_64, без release tag и обещания совместимости с другими дистрибутивами. Получайте artifact только из workflow этого репозитория; сравните `revision` с проверенным SHA и выполните проверки контрольных сумм. Checksum подтверждает целостность, но сам по себе не подтверждает издателя.
+Ручной workflow CI создаёт development artifact `linux-x86_64-<commit>` из точного SHA исходников. Автозапуск отключён; обязательные проверки выполняются локально. Это сборка Ubuntu 24.04 x86_64, без release tag и обещания совместимости с другими дистрибутивами. Получайте artifact только из workflow этого репозитория; сравните `revision` с проверенным SHA и выполните проверки контрольных сумм. Checksum подтверждает целостность, но сам по себе не подтверждает издателя.
 
 ```sh
 sha256sum -c want-garde-linux-x86_64.tar.gz.sha256
@@ -60,19 +60,19 @@ sudo systemctl restart want-garde.service
 
 Сервис работает без root, capabilities, sudo и Docker socket. Токен/config читаются, состояние доступно только service user. SIGTERM/SIGINT прерывают polling и ожидание backoff. Код 2 обозначает отказ конфигурации, identity или постоянную ошибку запуска; systemd не повторяет такой запуск автоматически. После аварийного завершения CLI проверьте отсутствие живой команды перед ручным удалением оставшегося `config.lock`.
 
-Сетевые ошибки polling повторяются с backoff 1..30 s; Telegram retry_after ограничен 1..3600 s. Ошибки токена, webhook и конфликт polling останавливают процесс. Ответы `/status` пока best effort: неоднозначная отправка не повторяется, offset хранится в памяти. После рестарта возможны повторные ответы на старые updates; команда может не получить ответ при сбое доставки. Сохраняемые offsets/outbox и гарантии доставки относятся к #4.
+Сетевые ошибки polling повторяются с backoff 1..30 s с учётом Telegram retry_after. Ошибки токена, webhook и конфликт polling останавливают процесс. События, ответы и polling offset сохраняются в SQLite до отправки. Неоднозначная отправка может повториться с тем же ID. Срок доставки события: 24 часа; ответа: 10 минут. См. [доставку, диагностику и ограничения](delivery.md).
 
 Для отката первой неуспешной установки остановите и отключите только `want-garde.service`; сохраните конфигурацию и токен для исправления. При последующих ручных обновлениях сначала сохраните предыдущий SHA и файлы, остановите сервис, переключите `current` на проверенную сборку и проверьте запуск. Совместимость будущих данных и автоматический rollback требуют отдельных тикетов. Не запускайте helper или MCP: в #3 они остаются каркасом.
 
 ## English
 
-The first service runs on one Linux VPS with a dedicated Telegram bot token and HTTPS polling. The owner can use `/start`, `/help`, `/status`, and `/language` in a private chat. Unknown users, groups, callbacks, and edited messages receive no host status. Initial binding is local; usernames and group-administrator status grant no access.
+The service runs on one Linux VPS with a dedicated Telegram bot token and HTTPS polling. The owner can use `/start`, `/help`, `/status`, `/delivery`, and `/language` in a private chat. Unknown users, groups, callbacks, and edited messages receive no host status. Initial binding is local; usernames and group-administrator status grant no access.
 
 ### Preparation
 
 Use systemd, outbound HTTPS access to api.telegram.org, and a dedicated token without a webhook. The service never removes a webhook automatically. Do not run another poller with the same token. Local configuration is checked before network access. Proxy configuration belongs to #14; the current transport ignores proxy environment variables and leaves OS routing unchanged.
 
-CI produces a development artifact named `linux-x86_64-<commit>` from the exact source SHA. It is an Ubuntu 24.04 x86_64 build, without a release tag or a compatibility promise for other distributions. Download only from this repository's workflow. Use the checksum and extraction commands above, inspect the archive entries before extraction, and compare `revision` with the reviewed full SHA. Checksums establish integrity, not publisher identity by themselves.
+The manual CI workflow produces a development artifact named `linux-x86_64-<commit>` from the exact source SHA. Automatic triggers are disabled; required checks run locally. It is an Ubuntu 24.04 x86_64 build, without a release tag or a compatibility promise for other distributions. Download only from this repository's workflow. Use the checksum and extraction commands above, inspect the archive entries before extraction, and compare `revision` with the reviewed full SHA. Checksums establish integrity, not publisher identity by themselves.
 
 The installation commands above apply to a new installation. Inspect any existing `want-garde` account, unit, or directory before reuse. Replace `<commit>` with the reviewed full SHA and `123456789` with your Telegram user ID. The commands create a separate system account, restricted configuration/token files, a private state directory, an immutable binary directory, and a `current` symlink. Enable the unit only after `--check-config` succeeds as the service user.
 
@@ -86,6 +86,6 @@ Use the systemctl and journalctl commands above to inspect, stop, start, and res
 
 The daemon has no root, capabilities, sudo, or Docker-socket access. Configuration/token files are read only; state is private to the service user. SIGTERM/SIGINT interrupt polling and backoff. Exit code 2 means invalid configuration/identity or a permanent startup failure; systemd does not restart it automatically. If a terminated CLI leaves `config.lock`, confirm that no binding command is running before removing that lock manually.
 
-Polling network failures use a 1..30-second backoff; Telegram retry_after is bounded to 1..3600 seconds. Invalid tokens, webhooks, and polling conflicts stop the process. Status replies are currently best effort: ambiguous sends are not retried and offsets remain in memory. Restart can repeat replies to old updates, and a delivery failure can leave a command unanswered. Durable offsets/outbox and delivery guarantees belong to #4.
+Polling network failures use a 1..30-second backoff and respect Telegram retry_after. Invalid tokens, webhooks, and polling conflicts stop the process. Events, replies, and polling progress are persisted in SQLite before sending. An ambiguous send can repeat with the same ID. Events expire after 24 hours; replies after 10 minutes. See [delivery, diagnostics, and limitations](delivery.md).
 
 To roll back a failed first installation, stop and disable only `want-garde.service`, retaining configuration and token for correction. Before later manual updates, preserve the previous SHA/files, stop the service, switch `current` to a verified build, and check startup. Future data compatibility and automatic rollback require their implementation issues. Helper and MCP remain scaffolds in #3.

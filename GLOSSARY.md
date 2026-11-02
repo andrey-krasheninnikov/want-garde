@@ -65,6 +65,15 @@ _Avoid_: Operation request / Запрос операции, когда речь 
 
 Адаптер наблюдения за выбранным источником состояния или активности VPS. / An observation adapter for a selected source of VPS state or activity.
 
+**Delivery / Доставка**
+
+Намерение отправить одно сообщение конкретному разрешённому получателю, со стабильным идентификатором и сохраняемым итогом всех повторов. / One intent to deliver a message to a particular permitted recipient, with a stable identifier and a persisted outcome across retries.
+_Avoid_: Event / Событие, когда речь об отправке сообщения / when referring to message transmission.
+
+**Dead letter / Неисправимая доставка**
+
+Завершённая доставка, которая не получила успешного подтверждения из-за постоянной ошибки, истечения срока или исчерпания повторов. / A terminal delivery without successful acknowledgement because of a permanent error, expiration, or exhausted retries.
+
 **Coverage / Покрытие наблюдения**
 
 Наблюдаемая доступность источников; отсутствие данных не доказывает исправность VPS. / Observable source availability; absence of data does not prove VPS health.

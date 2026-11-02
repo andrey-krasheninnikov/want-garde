@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{fs, future::Future, path::PathBuf};
 
+pub mod delivery;
 pub mod host;
+pub mod runtime;
 pub mod telegram;
 
 pub trait StatusSource {
@@ -53,14 +55,9 @@ impl Bot {
         })
     }
 
-    pub async fn handle(
-        &mut self,
-        update: &Value,
-        source: &impl StatusSource,
-        username: &str,
-    ) -> Result<Option<Reply>> {
+    fn command<'a>(&self, update: &'a Value, username: &str) -> Option<(&'a str, Vec<&'a str>)> {
         let m = &update["message"];
-        let owner = self.config.owner()?;
+        let owner = self.config.owner().ok()?;
         let authorized = m["from"]["id"]
             .as_u64()
             .is_some_and(|n| n.to_string() == owner)
@@ -71,21 +68,30 @@ impl Bot {
                 .is_some_and(|n| n.to_string() == owner)
             && m.get("sender_chat").is_none();
         if !authorized {
-            return Ok(None);
+            return None;
         }
-        let Some(text) = m["text"].as_str().filter(|s| s.len() <= 4096) else {
-            return Ok(None);
-        };
+        let text = m["text"].as_str().filter(|s| s.len() <= 4096)?;
         let words: Vec<_> = text.split_whitespace().collect();
-        let Some(command) = words.first() else {
-            return Ok(None);
-        };
+        let command = *words.first()?;
         let command = match command.split_once('@') {
             Some((cmd, target)) if target.eq_ignore_ascii_case(username) => cmd,
-            Some(_) => return Ok(None),
+            Some(_) => return None,
             None => command,
         };
-        let text = match (command, &words[1..]) {
+        Some((command, words[1..].to_vec()))
+    }
+
+    pub async fn handle(
+        &mut self,
+        update: &Value,
+        source: &impl StatusSource,
+        username: &str,
+    ) -> Result<Option<Reply>> {
+        let Some((command, args)) = self.command(update, username) else {
+            return Ok(None);
+        };
+        let owner = self.config.owner()?;
+        let text = match (command, args.as_slice()) {
             ("/status", []) => {
                 let result = OperationResult::ServerStatus {
                     server_id: self.config.server_id.clone(),
@@ -125,6 +131,128 @@ impl Bot {
             text,
         }))
     }
+
+    pub async fn process_update(
+        &mut self,
+        database: &runtime::Database,
+        update: &Value,
+        source: &impl StatusSource,
+        username: &str,
+    ) -> Result<i64> {
+        let id = update["update_id"]
+            .as_i64()
+            .filter(|id| (0..i64::MAX).contains(id))
+            .ok_or("telegram.response")?;
+        let offset = database.call(|store| store.offset()).await?;
+        if id < offset {
+            return Ok(offset);
+        }
+        let reply = if self
+            .command(update, username)
+            .is_some_and(|(command, args)| command == "/delivery" && args.is_empty())
+        {
+            let health = database.call(|store| store.health(runtime::now())).await?;
+            Some(Reply {
+                chat_id: self.config.owner()?.into(),
+                text: render_delivery(&health, &self.locale),
+            })
+        } else {
+            match self.handle(update, source, username).await {
+                Ok(reply) => reply,
+                Err(code) => {
+                    eprintln!("{code}: {}", message(&self.locale, "operation_failed"));
+                    Some(Reply {
+                        chat_id: self.config.owner()?.into(),
+                        text: message(&self.locale, "operation_failed").into(),
+                    })
+                }
+            }
+        };
+        database
+            .call(move |store| store.consume_update(id, reply, runtime::now()))
+            .await
+    }
+
+    pub async fn publish_event(
+        &self,
+        database: &runtime::Database,
+        event: garde_contracts::Event,
+    ) -> Result<()> {
+        let reason = message(&self.locale, event.classification.reason_key.as_str());
+        let reason = if reason == "message.unavailable" {
+            event.classification.reason_key.as_str()
+        } else {
+            reason
+        };
+        let mut text = format!(
+            "{}: {}\n{}\n{}",
+            message(&self.locale, "event_title"),
+            isolate(self.config.server_id.as_str()),
+            isolate(reason),
+            event.observed_at.to_rfc3339()
+        );
+        for evidence in event.evidence.iter().take(8) {
+            text.push_str(&format!(
+                "\n{}: {}",
+                isolate(evidence.name.as_str()),
+                isolate(&evidence.value)
+            ));
+        }
+        let replies = vec![Reply {
+            chat_id: self.config.owner()?.into(),
+            text,
+        }];
+        database
+            .call(move |store| store.publish(&event, &replies, runtime::now()))
+            .await
+    }
+}
+
+fn render_delivery(health: &garde_contracts::DeliveryHealth, locale: &str) -> String {
+    let mut lines = vec![
+        format!(
+            "{}: {}",
+            message(locale, "delivery_title"),
+            isolate(health.server_id.as_str())
+        ),
+        format!(
+            "{}: {}",
+            message(locale, "observed_at"),
+            isolate(&health.observed_at.to_rfc3339())
+        ),
+    ];
+    for (key, value) in [
+        ("delivery_pending", health.pending),
+        ("delivery_in_flight", health.in_flight),
+        ("delivery_delivered", health.delivered),
+        ("delivery_dead_letter", health.dead_letter),
+        ("delivery_rate_limited", health.rate_limited),
+        ("delivery_pruned", health.pruned_records),
+    ] {
+        lines.push(format!(
+            "{}: {}",
+            message(locale, key),
+            isolate(&value.to_string())
+        ));
+    }
+    if let Some(at) = health.oldest_pending_at {
+        lines.push(format!(
+            "{}: {}",
+            message(locale, "delivery_oldest"),
+            isolate(&at.to_rfc3339())
+        ));
+    }
+    lines.push(message(locale, "delivery_uncertainty").into());
+    for problem in &health.problems {
+        lines.push(isolate(&format!(
+            "{} {} ({}){}",
+            problem.delivery_id.as_str(),
+            problem.reason_key.as_str(),
+            problem.attempts,
+            if problem.uncertain { " ?" } else { "" }
+        )));
+    }
+    lines.join("\n")
 }
 
 fn isolate(value: &str) -> String {
@@ -213,70 +341,7 @@ fn render_status(result: &OperationResult, locale: &str) -> String {
 }
 
 pub async fn serve(config: Config) -> Result<()> {
-    use std::time::Duration;
-    let transport = telegram::Telegram::new(config.token()?).map_err(|e| e.code)?;
-    let locale = config.default_locale.clone();
-    let mut bot = Bot::new(config)?;
-    let source = host::LinuxHost::default();
-    let mut delay = 1u64;
-    let username = loop {
-        match transport.identity().await {
-            Ok(username) => break username,
-            Err(e) if e.fatal => return Err(e.code),
-            Err(e) => {
-                eprintln!("{}: {}", e.code, message(&locale, "operation_failed"));
-                tokio::time::sleep(Duration::from_secs(delay).max(e.retry_after)).await;
-                delay = (delay * 2).min(30);
-            }
-        }
-    };
-    eprintln!("service.ready: {}", message(&locale, "service_ready"));
-    let mut offset = 0;
-    delay = 1;
-    loop {
-        let updates = match transport.updates(offset).await {
-            Ok(updates) => {
-                delay = 1;
-                updates
-            }
-            Err(e) if e.fatal => return Err(e.code),
-            Err(e) => {
-                eprintln!("{}: {}", e.code, message(&locale, "operation_failed"));
-                tokio::time::sleep(Duration::from_secs(delay).max(e.retry_after)).await;
-                delay = (delay * 2).min(30);
-                continue;
-            }
-        };
-        for update in updates {
-            let id = update["update_id"].as_i64().ok_or("telegram.response")?;
-            if id < offset {
-                continue;
-            }
-            match bot.handle(&update, &source, &username).await {
-                Ok(Some(reply)) => match transport.send(&reply).await {
-                    Ok(()) => eprintln!("reply.sent"),
-                    Err(e) if e.fatal => return Err(e.code),
-                    Err(e) => eprintln!("{}: {}", e.code, message(&locale, "operation_failed")),
-                },
-                Ok(None) => {}
-                Err(code) => {
-                    eprintln!("{code}: {}", message(&locale, "operation_failed"));
-                    let reply = Reply {
-                        chat_id: bot.config.owner()?.to_owned(),
-                        text: message(&bot.locale, "operation_failed").to_owned(),
-                    };
-                    if let Err(e) = transport.send(&reply).await {
-                        if e.fatal {
-                            return Err(e.code);
-                        }
-                        eprintln!("{}: {}", e.code, message(&locale, "operation_failed"));
-                    }
-                }
-            }
-            // shortcut: offsets and replies are not durable until the outbox implementation in #4.
-            offset = id + 1;
-        }
-    }
+    runtime::serve(config).await
 }
 
 pub fn run_process(work: impl Future<Output = std::process::ExitCode>) -> std::process::ExitCode {

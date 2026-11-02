@@ -1,6 +1,45 @@
 use std::{fs, os::unix::fs::PermissionsExt, process::Command};
 
 #[test]
+fn delivery_diagnostics_are_read_only_json_and_work_without_a_token() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let config = garde_config::Config {
+        server_id: garde_contracts::Id::new("diagnostic-host").unwrap(),
+        bot_token_file: dir.path().join("absent-token"),
+        state_dir: dir.path().into(),
+        default_locale: "en".into(),
+        owner_user_id: Some("123456789".into()),
+    };
+    let path = dir.path().join("config.json");
+    fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+    let mut store =
+        garde_daemon::delivery::Store::open(dir.path(), "diagnostic-host", "123456789").unwrap();
+    store
+        .consume_update(
+            1,
+            Some(garde_daemon::Reply {
+                chat_id: "123456789".into(),
+                text: "private_result".into(),
+            }),
+            1000,
+        )
+        .unwrap();
+    let before = fs::read(dir.path().join("garde.sqlite3")).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_want-garde-daemon"))
+        .args(["--delivery-status", "--config", path.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    let health: garde_contracts::DeliveryHealth = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(health.pending, 1);
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("private_result"));
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("123456789"));
+    assert_eq!(before, fs::read(dir.path().join("garde.sqlite3")).unwrap());
+}
+
+#[test]
 fn validates_local_configuration_without_network_and_never_echoes_secrets() {
     let temporary = tempfile::tempdir().unwrap();
     let dir = temporary.path().to_path_buf();

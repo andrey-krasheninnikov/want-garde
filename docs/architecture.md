@@ -2,9 +2,9 @@
 
 ## Статус / Status
 
-Архитектура описывает целевой продукт. В #3 реализованы приватный Telegram `/status`, локальная привязка владельца, выбор языка и ручной systemd-запуск. SQLite/outbox и остальные управляющие интерфейсы следуют по roadmap. Сборка сама по себе не подтверждает runtime-поддержку дистрибутива.
+Архитектура описывает целевой продукт. В #3 реализованы приватный Telegram `/status`, локальная привязка владельца, выбор языка и ручной systemd-запуск. В #4 добавлены SQLite для событий, доставок и polling offset, восстановление очереди и диагностика. Остальные управляющие интерфейсы следуют по roadmap. Сборка сама по себе не подтверждает runtime-поддержку дистрибутива.
 
-The architecture describes the target product. #3 implements private Telegram `/status`, local owner binding, language selection, and manual systemd startup. SQLite/outbox and the remaining control interfaces follow the roadmap. Compilation alone does not establish distribution runtime support.
+The architecture describes the target product. #3 implements private Telegram `/status`, local owner binding, language selection, and manual systemd startup. #4 adds SQLite for events, deliveries, and polling progress, queue recovery, and diagnostics. The remaining control interfaces follow the roadmap. Compilation alone does not establish distribution runtime support.
 
 ## Компоненты / Modules
 
@@ -105,6 +105,6 @@ Shared formats are detailed in [wire contracts](contracts.md). / Общие фо
 
 ## Initial runtime / Первая установка
 
-#3 stores the local owner in restricted installation configuration; the local CLI binds it. A small private preferences file stores the owner locale. SQLite and durable delivery arrive in #4. Status replies and polling offsets are transient; see [installation and limitations](installation.md).
+#3 stores the local owner in restricted installation configuration; the local CLI binds it. A small private preferences file stores the owner locale. #4 persists events, replies, recipient cooldowns, and polling offsets in SQLite. The daemon owns one writer thread with bounded requests; local daemon diagnostics read the database without recovering active sends. See [delivery and recovery](delivery.md).
 
-В #3 владелец хранится в закрытой конфигурации установки и привязывается локальным CLI. Небольшой закрытый файл предпочтений хранит язык владельца. SQLite и сохраняемая доставка добавляются в #4. Ответы на status и polling offsets пока не сохраняются; см. [установку и ограничения](installation.md).
+В #3 владелец хранится в закрытой конфигурации установки и привязывается локальным CLI. Небольшой закрытый файл предпочтений хранит язык владельца. В #4 SQLite сохраняет события, ответы, паузы получателей и polling offset. Daemon владеет одним writer thread с ограниченной очередью запросов; локальная диагностика читает базу без восстановления активных отправок. См. [доставку и восстановление](delivery.md).
