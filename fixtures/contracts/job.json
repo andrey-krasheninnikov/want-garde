@@ -1,0 +1,10 @@
+{
+  "version": "1",
+  "id": "job-001",
+  "request_id": "request-001",
+  "server_id": "server-demo",
+  "state": {
+    "type": "needs_reconciliation",
+    "reason_key": "job.outcome_unknown"
+  }
+}

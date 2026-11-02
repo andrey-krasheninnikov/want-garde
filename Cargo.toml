@@ -1,0 +1,21 @@
+[workspace]
+members = ["crates/*", "apps/daemon", "apps/cli", "apps/helper", "apps/mcp", "tools/xtask"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0-dev.0"
+edition = "2024"
+rust-version = "1.93.0"
+license = "MIT"
+repository = "https://github.com/andrey-krasheninnikov/want-garde"
+
+[workspace.dependencies]
+garde-contracts = { path = "crates/contracts" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", default-features = false, features = ["std", "serde"] }
+schemars = { version = "1.2.3", features = ["chrono04"] }
+ts-rs = { version = "12.0.1", features = ["chrono-impl", "no-serde-warnings"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"

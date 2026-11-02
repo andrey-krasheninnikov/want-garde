@@ -1,0 +1,10 @@
+---
+import { locales } from "@want-garde/i18n";
+import ScaffoldPage from "../../layouts/ScaffoldPage.astro";
+export function getStaticPaths() {
+  return locales.map((locale) => ({ params: { locale }, props: { locale } }));
+}
+const { locale } = Astro.props;
+---
+
+<ScaffoldPage locale={locale} />

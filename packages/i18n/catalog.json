@@ -1,0 +1,101 @@
+{
+  "default": "en",
+  "locales": {
+    "ru": {
+      "nativeName": "Русский",
+      "dir": "ltr",
+      "scaffold": "Каркас разработки. Функции управления сервером пока недоступны.",
+      "unavailable": "Функции пока недоступны.",
+      "usage": "Использование",
+      "language": "Язык"
+    },
+    "en": {
+      "nativeName": "English",
+      "dir": "ltr",
+      "scaffold": "Development scaffold. Server functions are not available yet.",
+      "unavailable": "Functions are not available yet.",
+      "usage": "Usage",
+      "language": "Language"
+    },
+    "zh-Hans": {
+      "nativeName": "简体中文",
+      "dir": "ltr",
+      "scaffold": "开发框架。服务器管理功能尚不可用。",
+      "unavailable": "功能尚不可用。",
+      "usage": "用法",
+      "language": "语言"
+    },
+    "es": {
+      "nativeName": "Español",
+      "dir": "ltr",
+      "scaffold": "Estructura de desarrollo. Las funciones del servidor aún no están disponibles.",
+      "unavailable": "Las funciones aún no están disponibles.",
+      "usage": "Uso",
+      "language": "Idioma"
+    },
+    "pt-BR": {
+      "nativeName": "Português (Brasil)",
+      "dir": "ltr",
+      "scaffold": "Estrutura de desenvolvimento. As funções do servidor ainda não estão disponíveis.",
+      "unavailable": "As funções ainda não estão disponíveis.",
+      "usage": "Uso",
+      "language": "Idioma"
+    },
+    "hi": {
+      "nativeName": "हिन्दी",
+      "dir": "ltr",
+      "scaffold": "विकास का ढाँचा। सर्वर प्रबंधन सुविधाएँ अभी उपलब्ध नहीं हैं।",
+      "unavailable": "सुविधाएँ अभी उपलब्ध नहीं हैं।",
+      "usage": "उपयोग",
+      "language": "भाषा"
+    },
+    "ja": {
+      "nativeName": "日本語",
+      "dir": "ltr",
+      "scaffold": "開発用の骨組みです。サーバー管理機能はまだ利用できません。",
+      "unavailable": "機能はまだ利用できません。",
+      "usage": "使い方",
+      "language": "言語"
+    },
+    "ar": {
+      "nativeName": "العربية",
+      "dir": "rtl",
+      "scaffold": "هيكل قيد التطوير. وظائف إدارة الخادم غير متاحة بعد.",
+      "unavailable": "الوظائف غير متاحة بعد.",
+      "usage": "الاستخدام",
+      "language": "اللغة"
+    },
+    "he": {
+      "nativeName": "עברית",
+      "dir": "rtl",
+      "scaffold": "שלד בפיתוח. פעולות ניהול השרת עדיין אינן זמינות.",
+      "unavailable": "הפעולות עדיין אינן זמינות.",
+      "usage": "שימוש",
+      "language": "שפה"
+    },
+    "tr": {
+      "nativeName": "Türkçe",
+      "dir": "ltr",
+      "scaffold": "Geliştirme iskeleti. Sunucu yönetimi işlevleri henüz kullanılamıyor.",
+      "unavailable": "İşlevler henüz kullanılamıyor.",
+      "usage": "Kullanım",
+      "language": "Dil"
+    },
+    "fr": {
+      "nativeName": "Français",
+      "dir": "ltr",
+      "scaffold": "Structure de développement. Les fonctions du serveur ne sont pas encore disponibles.",
+      "unavailable": "Les fonctions ne sont pas encore disponibles.",
+      "usage": "Utilisation",
+      "language": "Langue"
+    },
+    "de": {
+      "nativeName": "Deutsch",
+      "dir": "ltr",
+      "scaffold": "Entwicklungsgerüst. Die Serverfunktionen sind noch nicht verfügbar.",
+      "unavailable": "Die Funktionen sind noch nicht verfügbar.",
+      "usage": "Verwendung",
+      "language": "Sprache"
+    }
+  }
+}

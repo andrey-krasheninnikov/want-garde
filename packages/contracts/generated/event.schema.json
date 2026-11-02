@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Event",
+  "type": "object",
+  "properties": {
+    "classification": {
+      "$ref": "#/$defs/Classification"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Evidence"
+      }
+    },
+    "id": {
+      "$ref": "#/$defs/Id"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "server_id": {
+      "$ref": "#/$defs/Id"
+    },
+    "source": {
+      "$ref": "#/$defs/Id"
+    },
+    "version": {
+      "$ref": "#/$defs/WireVersion"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "id",
+    "server_id",
+    "observed_at",
+    "source",
+    "classification",
+    "evidence"
+  ],
+  "$defs": {
+    "Classification": {
+      "type": "object",
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/Id"
+        },
+        "reason_key": {
+          "$ref": "#/$defs/Id"
+        },
+        "rule_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "category",
+        "severity",
+        "rule_id",
+        "reason_key"
+      ]
+    },
+    "Evidence": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/Id"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "value"
+      ]
+    },
+    "Id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "Severity": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warning",
+        "high",
+        "critical"
+      ]
+    },
+    "WireVersion": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    }
+  }
+}

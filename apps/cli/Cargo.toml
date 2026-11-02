@@ -1,0 +1,17 @@
+[package]
+name = "garde-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "want-garde"
+path = "src/main.rs"
+
+[dependencies]
+garde-entrypoint = { path = "../../crates/entrypoint" }
+
+[lints]
+workspace = true

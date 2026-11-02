@@ -1,0 +1,10 @@
+target/
+node_modules/
+**/dist/
+**/.astro/
+packages/contracts/generated/
+Cargo.lock
+package-lock.json
+AGENTS.md
+README.md
+docs/agents/

@@ -8,7 +8,7 @@
 
 Want Garde: открытый self-hosted продукт для мониторинга состояния и безопасности VPS и управления сервером через Telegram. Каждая установка использует собственного бота и не зависит от центрального управляющего сервиса.
 
-**Статус: архитектура; подготовка рабочего каркаса.** Репозиторий содержит правила работы, архитектуру, спецификацию и roadmap. Рабочий Rust-бот, bootstrap-установщик, TMA и лендинг ещё не выпущены.
+**Статус: архитектура и собираемый каркас.** Есть общие контракты, Rust entrypoints, React TMA и Astro-страницы разработки. Рабочий Rust-бот, bootstrap-установщик, TMA и лендинг ещё не выпущены.
 
 [Спецификация](https://github.com/andrey-krasheninnikov/want-garde/issues/1) · [Тикеты](https://github.com/andrey-krasheninnikov/want-garde/issues)
 
@@ -41,7 +41,7 @@ Want Garde: открытый self-hosted продукт для монитори�
 
 Want Garde is an open-source self-hosted product for VPS health and security monitoring and server management through Telegram. Each installation uses its own bot and does not depend on a central control service.
 
-**Status: architecture; scaffold in progress.** This repository contains workflow rules, architecture, the specification, and roadmap. The working Rust bot, bootstrap installer, TMA, and landing page have not been released yet.
+**Status: architecture and buildable scaffold.** Shared contracts, Rust entrypoints, React TMA, and Astro development pages are available. The working Rust bot, bootstrap installer, TMA, and landing page have not been released yet.
 
 [Specification](https://github.com/andrey-krasheninnikov/want-garde/issues/1) · [Tickets](https://github.com/andrey-krasheninnikov/want-garde/issues)
 

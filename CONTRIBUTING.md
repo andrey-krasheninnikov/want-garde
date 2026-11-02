@@ -26,9 +26,9 @@ Authored documents, PRs, and issue comments contain RU/EN. Never publish private
 
 ## Development contract / Контракт разработки
 
-Toolchains: Rust 1.93.0; Node.js 24; npm 11. Cargo.lock and package-lock.json are committed. Install with npm ci and use cargo commands with --locked after the initial lockfile exists.
+Toolchains: Rust 1.93.0; Node.js 24; npm 11. Cargo.lock and package-lock.json are committed. Install with npm ci --ignore-scripts and use cargo commands with --locked after the initial lockfile exists.
 
-Toolchains: Rust 1.93.0; Node.js 24; npm 11. Cargo.lock и package-lock.json сохраняются в Git. Зависимости устанавливаются через npm ci; после первого lockfile Cargo запускается с --locked.
+Toolchains: Rust 1.93.0; Node.js 24; npm 11. Cargo.lock и package-lock.json сохраняются в Git. Зависимости устанавливаются через npm ci --ignore-scripts; после первого lockfile Cargo запускается с --locked.
 
 The following commands are the common local/CI checks. / Общие локальные/CI проверки:
 
@@ -58,3 +58,17 @@ For local previews, run npm run dev:tma or npm run dev:landing. Servers bind to 
 No deployment or release follows from a passing build. A release requires the evidence and immutable-artifact checks in [ADR-0004](docs/adr/0004-delivery.md).
 
 Успешная сборка не означает deployment или release. Релиз требует доказательств и проверок неизменяемых артефактов из [ADR-0004](docs/adr/0004-delivery.md).
+
+## Entrypoints / Точки входа
+
+The four binaries are want-garde-daemon, want-garde, want-garde-helper, and want-garde-mcp. Each supports --version and --lang LOCALE --help. All other invocations fail with exit code 2 and no stdout. The shared locale catalog covers the 12 languages; unknown locale input falls back to English. No token, socket, database, or root access is needed for the scaffold.
+
+Четыре binaries: want-garde-daemon, want-garde, want-garde-helper и want-garde-mcp. Каждый поддерживает --version и --lang LOCALE --help. Остальные вызовы завершаются кодом 2 без stdout. Общий каталог покрывает 12 языков; неизвестная локаль получает английский fallback. Каркас не требует token, socket, базы или root-доступа.
+
+Development previews: http://127.0.0.1:5173/?lang=ru and http://127.0.0.1:4321/ru/. Landing routes cover all locale identifiers. Unknown static paths return 404. See [wire contracts](docs/contracts.md) before changing shared DTOs.
+
+Локальные страницы: http://127.0.0.1:5173/?lang=ru и http://127.0.0.1:4321/ru/. Лендинг имеет маршруты всех локалей. Неизвестные статические пути возвращают 404. Перед изменением DTO прочитайте [wire-контракты](docs/contracts.md).
+
+Astro 7 may keep its preview in the background. Stop the project preview with npm exec --workspace @want-garde/landing -- astro dev stop; do not kill other Node processes. Vite stops with Ctrl-C.
+
+Astro 7 может оставить preview в фоне. Остановите preview проекта через npm exec --workspace @want-garde/landing -- astro dev stop; не завершайте чужие Node-процессы. Vite останавливается через Ctrl-C.

@@ -1,0 +1,10 @@
+{
+  "version": "1",
+  "principal_id": "telegram:123",
+  "scope": {
+    "server_id": "server-demo",
+    "resource_ids": [],
+    "allowed_chat_ids": ["-1000000000001"]
+  },
+  "capabilities": ["status.read", "events.read", "incidents.read"]
+}

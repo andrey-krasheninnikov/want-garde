@@ -1,0 +1,6 @@
+{
+  "version": "1",
+  "request_id": "request-001",
+  "server_id": "server-demo",
+  "action": { "type": "server.status" }
+}

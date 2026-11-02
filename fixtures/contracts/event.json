@@ -1,0 +1,14 @@
+{
+  "version": "1",
+  "id": "event-001",
+  "server_id": "server-demo",
+  "observed_at": "2026-01-01T00:00:00Z",
+  "source": "ssh",
+  "classification": {
+    "category": "ssh.authentication",
+    "severity": "warning",
+    "rule_id": "ssh.failed",
+    "reason_key": "ssh.authentication_failed"
+  },
+  "evidence": [{ "name": "remote_ip", "value": "203.0.113.10" }]
+}

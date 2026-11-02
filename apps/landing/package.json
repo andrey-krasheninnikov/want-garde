@@ -1,0 +1,19 @@
+{
+  "name": "@want-garde/landing",
+  "version": "0.1.0-dev.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --host 127.0.0.1",
+    "check": "astro check",
+    "build": "astro build"
+  },
+  "dependencies": {
+    "@want-garde/contracts": "0.1.0-dev.0",
+    "@want-garde/i18n": "0.1.0-dev.0",
+    "astro": "7.4.5"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.12"
+  }
+}
