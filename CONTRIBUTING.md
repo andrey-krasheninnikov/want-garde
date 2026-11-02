@@ -61,9 +61,9 @@ No deployment or release follows from a passing build. A release requires the ev
 
 ## Entrypoints / Точки входа
 
-The four binaries are want-garde-daemon, want-garde, want-garde-helper, and want-garde-mcp. Each supports --version and --lang LOCALE --help. All other invocations fail with exit code 2 and no stdout. The shared locale catalog covers the 12 languages; unknown locale input falls back to English. No token, socket, database, or root access is needed for the scaffold.
+The binaries are want-garde-daemon, want-garde, want-garde-helper, and want-garde-mcp. Each supports --version and --lang LOCALE --help. The daemon accepts --config and --check-config; the CLI provides owner bind. See [installation](docs/installation.md) for configuration and exit codes. Helper/MCP reject operational invocations with exit code 2 and no stdout. The shared catalog covers 12 languages; unknown presentation locale input falls back to English.
 
-Четыре binaries: want-garde-daemon, want-garde, want-garde-helper и want-garde-mcp. Каждый поддерживает --version и --lang LOCALE --help. Остальные вызовы завершаются кодом 2 без stdout. Общий каталог покрывает 12 языков; неизвестная локаль получает английский fallback. Каркас не требует token, socket, базы или root-доступа.
+Binaries: want-garde-daemon, want-garde, want-garde-helper и want-garde-mcp. Каждый поддерживает --version и --lang LOCALE --help. Daemon принимает --config и --check-config; CLI предоставляет owner bind. Конфигурация и exit codes описаны в [установке](docs/installation.md). Helper/MCP отклоняют операционные вызовы кодом 2 без stdout. Каталог покрывает 12 языков; неизвестная локаль представления получает английский fallback.
 
 Development previews: http://127.0.0.1:5173/?lang=ru and http://127.0.0.1:4321/ru/. Landing routes cover all locale identifiers. Unknown static paths return 404. See [wire contracts](docs/contracts.md) before changing shared DTOs.
 
@@ -72,3 +72,7 @@ Development previews: http://127.0.0.1:5173/?lang=ru and http://127.0.0.1:4321/r
 Astro 7 may keep its preview in the background. Stop the project preview with npm exec --workspace @want-garde/landing -- astro dev stop; do not kill other Node processes. Vite stops with Ctrl-C.
 
 Astro 7 может оставить preview в фоне. Остановите preview проекта через npm exec --workspace @want-garde/landing -- astro dev stop; не завершайте чужие Node-процессы. Vite останавливается через Ctrl-C.
+
+The #3 TDD seams are Telegram update to reply/denial and process startup to diagnostics/exit. Tests replace external host/Telegram sources and use temporary private files. Real Linux systemd/permissions acceptance is separate from native macOS tests.
+
+Seams TDD в #3: Telegram update с ответом/отказом и запуск процесса с диагностикой/завершением. Tests подменяют внешние источники хоста/Telegram и используют временные закрытые файлы. Linux-проверка systemd/прав учитывается отдельно от native macOS tests.

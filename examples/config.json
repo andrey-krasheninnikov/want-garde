@@ -1,0 +1,7 @@
+{
+  "server_id": "my-vps",
+  "bot_token_file": "/etc/want-garde/telegram-token",
+  "state_dir": "/var/lib/want-garde",
+  "default_locale": "ru",
+  "owner_user_id": null
+}

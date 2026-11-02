@@ -1,0 +1,272 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HostSnapshot",
+  "type": "object",
+  "properties": {
+    "cpu_usage_percent": {
+      "$ref": "#/$defs/Measurement3"
+    },
+    "hostname": {
+      "$ref": "#/$defs/Measurement"
+    },
+    "kernel": {
+      "$ref": "#/$defs/Measurement"
+    },
+    "load_average": {
+      "$ref": "#/$defs/Measurement4"
+    },
+    "memory": {
+      "$ref": "#/$defs/Measurement5"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "os": {
+      "$ref": "#/$defs/Measurement"
+    },
+    "root_disk": {
+      "$ref": "#/$defs/Measurement5"
+    },
+    "uptime_seconds": {
+      "$ref": "#/$defs/Measurement2"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "hostname",
+    "os",
+    "kernel",
+    "uptime_seconds",
+    "cpu_usage_percent",
+    "load_average",
+    "memory",
+    "root_disk"
+  ],
+  "$defs": {
+    "ByteUsage": {
+      "type": "object",
+      "properties": {
+        "available_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "total_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "total_bytes",
+        "available_bytes"
+      ]
+    },
+    "Id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "Measurement": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "available"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "reason_key": {
+              "$ref": "#/$defs/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "unavailable"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "reason_key"
+          ]
+        }
+      ]
+    },
+    "Measurement2": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "available"
+            },
+            "value": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "reason_key": {
+              "$ref": "#/$defs/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "unavailable"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "reason_key"
+          ]
+        }
+      ]
+    },
+    "Measurement3": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "available"
+            },
+            "value": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "reason_key": {
+              "$ref": "#/$defs/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "unavailable"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "reason_key"
+          ]
+        }
+      ]
+    },
+    "Measurement4": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "available"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "format": "double"
+              },
+              "maxItems": 3,
+              "minItems": 3
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "reason_key": {
+              "$ref": "#/$defs/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "unavailable"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "reason_key"
+          ]
+        }
+      ]
+    },
+    "Measurement5": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "available"
+            },
+            "value": {
+              "$ref": "#/$defs/ByteUsage"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "reason_key": {
+              "$ref": "#/$defs/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "unavailable"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "reason_key"
+          ]
+        }
+      ]
+    }
+  }
+}

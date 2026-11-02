@@ -76,3 +76,7 @@ _Avoid_: Operation request / Запрос операции, когда речь 
 **Runner / Исполнитель команд**
 
 Отдельная непривилегированная identity выполнения shell-заданий. / A separate unprivileged identity for shell jobs.
+
+**Host snapshot / Снимок хоста**
+
+Состояние одной установки на момент измерения, включающее доступные показатели и явные сведения о недоступных показателях. / The state of one installation at a measurement time, including available measurements and explicit information about unavailable measurements.

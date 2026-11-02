@@ -11,7 +11,12 @@ name = "want-garde"
 path = "src/main.rs"
 
 [dependencies]
+garde-config = { path = "../../crates/config" }
 garde-entrypoint = { path = "../../crates/entrypoint" }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+tempfile = "3"
+serde_json.workspace = true

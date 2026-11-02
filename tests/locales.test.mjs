@@ -20,7 +20,7 @@ test("the public locale catalog covers all agreed languages and RTL", () => {
   assert.equal(defaultLocale, "en");
   for (const locale of locales) {
     const copy = messages(locale);
-    for (const key of ["nativeName", "scaffold", "unavailable", "usage", "language"]) {
+    for (const key of Object.keys(messages("en")).filter((key) => key !== "dir")) {
       assert.equal(typeof copy[key], "string");
       assert.ok(copy[key].length > 0);
     }

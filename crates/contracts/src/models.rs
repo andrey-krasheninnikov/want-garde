@@ -1,4 +1,4 @@
-use crate::{ContractError, Id, WireVersion};
+use crate::{ContractError, HostSnapshot, Id, WireVersion};
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -95,16 +95,17 @@ pub struct Grant {
     pub capabilities: Vec<Capability>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, TS)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum OperationResult {
     ServerStatus {
         server_id: Id,
         product_version: String,
+        snapshot: Box<HostSnapshot>,
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, TS)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum JobState {
     AwaitingApproval {},
@@ -117,7 +118,7 @@ pub enum JobState {
     NeedsReconciliation { reason_key: Id },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, TS)]
 #[serde(deny_unknown_fields)]
 pub struct Job {
     pub version: WireVersion,
