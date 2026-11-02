@@ -258,3 +258,44 @@ async fn a_slow_recipient_does_not_hold_delivery_to_another_recipient() {
     sender.abort();
     let _ = sender.await;
 }
+
+#[tokio::test]
+async fn a_fresh_status_command_after_an_idle_restart_reaches_the_outbox() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let config = Config {
+        server_id: Id::new("server-demo").unwrap(),
+        owner_user_id: Some("123456789".into()),
+        bot_token_file: dir.path().join("token"),
+        state_dir: dir.path().into(),
+        default_locale: "en".into(),
+    };
+    let old = garde_daemon::runtime::now() - 7 * 86400;
+    let mut store =
+        garde_daemon::delivery::Store::open(dir.path(), "server-demo", "123456789").unwrap();
+    store.consume_update(900000000, None, old).unwrap();
+    drop(store);
+    let database = Database::open(config.clone()).await.unwrap();
+    assert_eq!(
+        database
+            .call(|s| s.poll_offset(garde_daemon::runtime::now()))
+            .await
+            .unwrap(),
+        0
+    );
+    let mut bot = Bot::new(config).unwrap();
+    let command = json!({"update_id":42,"message":{"from":{"id":123456789,"is_bot":false},"chat":{"id":123456789,"type":"private"},"text":"/status"}});
+    assert_eq!(
+        bot.process_update(&database, &command, &Host, "test_bot")
+            .await
+            .unwrap(),
+        43
+    );
+    let delivery = database
+        .call(|s| s.claim(garde_daemon::runtime::now()))
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(delivery.reply.text.contains("Server status"));
+    assert!(delivery.reply.text.contains("ID: d-1"));
+}

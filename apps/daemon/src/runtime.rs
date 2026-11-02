@@ -167,7 +167,7 @@ async fn poll_loop<T: Transport>(
             delay = (delay * 2).min(30);
             continue;
         }
-        let offset = match database.call(|store| store.offset()).await {
+        let offset = match database.call(|store| store.poll_offset(now())).await {
             Ok(offset) => offset,
             Err(code) => {
                 if last_error != Some(code) {

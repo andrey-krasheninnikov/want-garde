@@ -370,6 +370,73 @@ fn missing_tables_in_a_known_schema_are_not_silently_recreated() {
 }
 
 #[test]
+fn inactive_polling_cursor_accepts_a_lower_new_sequence_after_restart() {
+    let dir = private_dir();
+    let mut store = Store::open(dir.path(), "server-demo", "123456789").unwrap();
+    store
+        .consume_update(
+            900000000,
+            Some(Reply {
+                chat_id: "123456789".into(),
+                text: "old result".into(),
+            }),
+            1000,
+        )
+        .unwrap();
+    drop(store);
+    let mut store = Store::open(dir.path(), "server-demo", "123456789").unwrap();
+    assert_eq!(store.poll_offset(1000 + 2 * 86400 - 1).unwrap(), 900000001);
+    assert_eq!(store.poll_offset(1000 + 2 * 86400).unwrap(), 0);
+    assert_eq!(store.health(1000 + 2 * 86400).unwrap().pending, 1);
+    let reply = || {
+        Some(Reply {
+            chat_id: "123456789".into(),
+            text: "new result".into(),
+        })
+    };
+    assert_eq!(
+        store.consume_update(42, reply(), 1000 + 7 * 86400).unwrap(),
+        43
+    );
+    assert_eq!(
+        store.consume_update(42, reply(), 1000 + 7 * 86400).unwrap(),
+        43
+    );
+    assert_eq!(store.health(1000 + 7 * 86400).unwrap().pending, 2);
+}
+
+#[test]
+fn a_new_sequence_can_reuse_an_update_id_without_reusing_an_old_delivery() {
+    let dir = private_dir();
+    let mut store = Store::open(dir.path(), "server-demo", "123456789").unwrap();
+    store
+        .consume_update(
+            42,
+            Some(Reply {
+                chat_id: "123456789".into(),
+                text: "original intent".into(),
+            }),
+            1000,
+        )
+        .unwrap();
+    store.poll_offset(1000 + 2 * 86400).unwrap();
+    store
+        .consume_update(
+            42,
+            Some(Reply {
+                chat_id: "123456789".into(),
+                text: "new intent".into(),
+            }),
+            1000 + 2 * 86400,
+        )
+        .unwrap();
+    assert_eq!(store.health(1000 + 2 * 86400).unwrap().pending, 2);
+    let next = store.claim(1000 + 2 * 86400).unwrap().unwrap();
+    assert!(next.reply.text.starts_with("new intent"));
+    assert!(next.reply.text.contains("ID: d-2"));
+}
+
+#[test]
 fn an_event_reaches_independent_recipients_and_pending_delivery_survives_restart() {
     let dir = private_dir();
     let event = event();

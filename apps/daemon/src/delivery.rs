@@ -168,6 +168,8 @@ impl Store {
                 ("owner", owner),
                 ("offset", "0"),
                 ("pruned", "0"),
+                ("epoch", "0"),
+                ("last_update_at", "0"),
             ] {
                 sql(transaction.execute("INSERT INTO meta VALUES(?1,?2)", params![key, value]))?;
             }
@@ -182,7 +184,12 @@ impl Store {
                 return Err("storage.identity");
             }
         }
-        for (key, limit) in [("offset", i64::MAX as u64), ("pruned", u32::MAX as u64)] {
+        for (key, limit) in [
+            ("offset", i64::MAX as u64),
+            ("pruned", u32::MAX as u64),
+            ("epoch", i64::MAX as u64),
+            ("last_update_at", i64::MAX as u64),
+        ] {
             let value: String =
                 sql(connection
                     .query_row("SELECT value FROM meta WHERE key=?1", [key], |r| r.get(0)))?;
@@ -205,6 +212,38 @@ impl Store {
                     r.get(0)
                 }))?;
         value.parse().map_err(|_| "storage.corrupt")
+    }
+
+    pub fn poll_offset(&mut self, now: i64) -> Result<i64> {
+        let offset = self.offset()?;
+        let last: String = sql(self.connection.query_row(
+            "SELECT value FROM meta WHERE key='last_update_at'",
+            [],
+            |r| r.get(0),
+        ))?;
+        let last = last.parse::<i64>().map_err(|_| "storage.corrupt")?;
+        // Telegram retains updates for 24h and can reset IDs after a week of inactivity.
+        if offset > 0 && now.saturating_sub(last) >= 2 * 86400 {
+            let epoch: String = sql(self.connection.query_row(
+                "SELECT value FROM meta WHERE key='epoch'",
+                [],
+                |r| r.get(0),
+            ))?;
+            let epoch = epoch
+                .parse::<i64>()
+                .map_err(|_| "storage.corrupt")?
+                .checked_add(1)
+                .ok_or("storage.quota")?;
+            let transaction = sql(self.connection.transaction())?;
+            sql(transaction.execute("UPDATE meta SET value='0' WHERE key='offset'", []))?;
+            sql(transaction.execute(
+                "UPDATE meta SET value=?1 WHERE key='epoch'",
+                [epoch.to_string()],
+            ))?;
+            sql(transaction.commit())?;
+            return Ok(0);
+        }
+        Ok(offset)
     }
 
     pub fn bind_bot(&mut self, id: &str) -> Result<()> {
@@ -242,10 +281,13 @@ impl Store {
         }
         let transaction = sql(self.connection.transaction())?;
         if let Some(reply) = reply {
+            let epoch: String =
+                sql(transaction
+                    .query_row("SELECT value FROM meta WHERE key='epoch'", [], |r| r.get(0)))?;
             enqueue(
                 &transaction,
                 None,
-                Some(&format!("telegram:{id}")),
+                Some(&format!("telegram:{epoch}:{id}")),
                 &reply,
                 now,
                 600,
@@ -255,6 +297,10 @@ impl Store {
         sql(transaction.execute(
             "UPDATE meta SET value=?1 WHERE key='offset'",
             [next.to_string()],
+        ))?;
+        sql(transaction.execute(
+            "UPDATE meta SET value=?1 WHERE key='last_update_at'",
+            [now.to_string()],
         ))?;
         sql(transaction.commit())?;
         Ok(next)

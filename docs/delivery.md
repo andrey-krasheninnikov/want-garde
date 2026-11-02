@@ -17,6 +17,8 @@ Daemon сохраняет нормализованное событие и ег�
 
 Успешное подтверждение в Telegram отправляется только из outbox. При отказе SQLite или квоте новый update не подтверждается. Telegram хранит updates не более 24 часов; более длительная остановка или backpressure могут потерять ещё не принятые команды. Файл языка сохраняется отдельно и атомарно. Повтор `/language` после остановки до фиксации offset идемпотентен.
 
+После 48 часов без принятых updates сохранённый polling offset сбрасывается перед следующим запросом. Это больше срока хранения Telegram и раньше возможного изменения последовательности ID после недели простоя. Дедупликация использует новую последовательность; принятые доставки сохраняют свои ID и текст. См. [правила Telegram](https://core.telegram.org/bots/api#update).
+
 ### Хранение и диагностика
 
 Состояние находится в `state_dir/garde.sqlite3`, с закрытыми файлами и каталогом 0700. `garde.lock` удерживается единственным writer; daemon диагностики открывает SQLite только для чтения. Не удаляйте lock-файл работающей установки. База привязана к server ID, владельцу и подтверждённой identity Telegram-бота. Замена токена того же бота допустима; перенос базы к другому боту или владельцу автоматически не выполняется.
@@ -55,6 +57,8 @@ Delivery is at least once within the deadlines and limits. A missing HTTP acknow
 - Pending and interrupted attempts survive shutdown. Diagnostics retain uncertainty. Failure to persist a send result retries that persistence before another HTTP send.
 
 Successful Telegram replies always pass through the outbox. SQLite failures or quotas prevent acknowledgement of a new update. Telegram retains updates for at most 24 hours; longer downtime or backpressure can lose commands that have not yet been accepted. Locale remains in its separate atomically written file. Repeating `/language` after interruption before offset commit is idempotent.
+
+After 48 hours without accepted updates, the saved polling offset resets before the next request. This exceeds Telegram retention and precedes its possible ID-sequence change after an idle week. Deduplication uses a new sequence; accepted deliveries retain their IDs and text. See [Telegram's rules](https://core.telegram.org/bots/api#update).
 
 ### Storage and diagnostics
 
