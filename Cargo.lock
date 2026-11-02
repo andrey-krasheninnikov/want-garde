@@ -236,7 +236,20 @@ dependencies = [
 name = "garde-cli"
 version = "0.1.0-dev.0"
 dependencies = [
+ "garde-config",
  "garde-entrypoint",
+ "serde_json",
+]
+
+[[package]]
+name = "garde-config"
+version = "0.1.0-dev.0"
+dependencies = [
+ "garde-contracts",
+ "garde-entrypoint",
+ "rustix",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

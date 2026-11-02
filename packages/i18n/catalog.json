@@ -7,7 +7,9 @@
       "scaffold": "Каркас разработки. Функции управления сервером пока недоступны.",
       "unavailable": "Функции пока недоступны.",
       "usage": "Использование",
-      "language": "Язык"
+      "language": "Язык",
+      "owner_bound": "Владелец привязан.",
+      "operation_failed": "Операция не выполнена."
     },
     "en": {
       "nativeName": "English",
@@ -15,7 +17,9 @@
       "scaffold": "Development scaffold. Server functions are not available yet.",
       "unavailable": "Functions are not available yet.",
       "usage": "Usage",
-      "language": "Language"
+      "language": "Language",
+      "owner_bound": "Owner bound.",
+      "operation_failed": "Operation failed."
     },
     "zh-Hans": {
       "nativeName": "简体中文",
@@ -23,7 +27,9 @@
       "scaffold": "开发框架。服务器管理功能尚不可用。",
       "unavailable": "功能尚不可用。",
       "usage": "用法",
-      "language": "语言"
+      "language": "语言",
+      "owner_bound": "已绑定所有者。",
+      "operation_failed": "操作失败。"
     },
     "es": {
       "nativeName": "Español",
@@ -31,7 +37,9 @@
       "scaffold": "Estructura de desarrollo. Las funciones del servidor aún no están disponibles.",
       "unavailable": "Las funciones aún no están disponibles.",
       "usage": "Uso",
-      "language": "Idioma"
+      "language": "Idioma",
+      "owner_bound": "Propietario vinculado.",
+      "operation_failed": "La operación falló."
     },
     "pt-BR": {
       "nativeName": "Português (Brasil)",
@@ -39,7 +47,9 @@
       "scaffold": "Estrutura de desenvolvimento. As funções do servidor ainda não estão disponíveis.",
       "unavailable": "As funções ainda não estão disponíveis.",
       "usage": "Uso",
-      "language": "Idioma"
+      "language": "Idioma",
+      "owner_bound": "Proprietário vinculado.",
+      "operation_failed": "A operação falhou."
     },
     "hi": {
       "nativeName": "हिन्दी",
@@ -47,7 +57,9 @@
       "scaffold": "विकास का ढाँचा। सर्वर प्रबंधन सुविधाएँ अभी उपलब्ध नहीं हैं।",
       "unavailable": "सुविधाएँ अभी उपलब्ध नहीं हैं।",
       "usage": "उपयोग",
-      "language": "भाषा"
+      "language": "भाषा",
+      "owner_bound": "स्वामी लिंक हो गया।",
+      "operation_failed": "कार्रवाई विफल हुई।"
     },
     "ja": {
       "nativeName": "日本語",
@@ -55,7 +67,9 @@
       "scaffold": "開発用の骨組みです。サーバー管理機能はまだ利用できません。",
       "unavailable": "機能はまだ利用できません。",
       "usage": "使い方",
-      "language": "言語"
+      "language": "言語",
+      "owner_bound": "所有者を登録しました。",
+      "operation_failed": "操作に失敗しました。"
     },
     "ar": {
       "nativeName": "العربية",
@@ -63,7 +77,9 @@
       "scaffold": "هيكل قيد التطوير. وظائف إدارة الخادم غير متاحة بعد.",
       "unavailable": "الوظائف غير متاحة بعد.",
       "usage": "الاستخدام",
-      "language": "اللغة"
+      "language": "اللغة",
+      "owner_bound": "تم ربط المالك.",
+      "operation_failed": "فشلت العملية."
     },
     "he": {
       "nativeName": "עברית",
@@ -71,7 +87,9 @@
       "scaffold": "שלד בפיתוח. פעולות ניהול השרת עדיין אינן זמינות.",
       "unavailable": "הפעולות עדיין אינן זמינות.",
       "usage": "שימוש",
-      "language": "שפה"
+      "language": "שפה",
+      "owner_bound": "הבעלים קושר.",
+      "operation_failed": "הפעולה נכשלה."
     },
     "tr": {
       "nativeName": "Türkçe",
@@ -79,7 +97,9 @@
       "scaffold": "Geliştirme iskeleti. Sunucu yönetimi işlevleri henüz kullanılamıyor.",
       "unavailable": "İşlevler henüz kullanılamıyor.",
       "usage": "Kullanım",
-      "language": "Dil"
+      "language": "Dil",
+      "owner_bound": "Sahip bağlandı.",
+      "operation_failed": "İşlem başarısız oldu."
     },
     "fr": {
       "nativeName": "Français",
@@ -87,7 +107,9 @@
       "scaffold": "Structure de développement. Les fonctions du serveur ne sont pas encore disponibles.",
       "unavailable": "Les fonctions ne sont pas encore disponibles.",
       "usage": "Utilisation",
-      "language": "Langue"
+      "language": "Langue",
+      "owner_bound": "Propriétaire associé.",
+      "operation_failed": "L’opération a échoué."
     },
     "de": {
       "nativeName": "Deutsch",
@@ -95,7 +117,9 @@
       "scaffold": "Entwicklungsgerüst. Die Serverfunktionen sind noch nicht verfügbar.",
       "unavailable": "Die Funktionen sind noch nicht verfügbar.",
       "usage": "Verwendung",
-      "language": "Sprache"
+      "language": "Sprache",
+      "owner_bound": "Eigentümer verknüpft.",
+      "operation_failed": "Vorgang fehlgeschlagen."
     }
   }
 }
