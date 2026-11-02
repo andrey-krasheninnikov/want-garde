@@ -47,6 +47,10 @@ npm run build
 git diff --check
 ```
 
+Run the required checks locally on the development MacBook. GitHub Actions is manual-only (`workflow_dispatch`) because hosted minutes are paid. Do not start it without an explicit request. Source and merge commits that change workflow triggers use `[skip ci]` to avoid starting a run while that change is published. Linux installation binaries may be built separately in an isolated directory on the target host; that build is distinct from the local checks.
+
+Обязательные проверки выполняются локально на рабочем MacBook. GitHub Actions запускается только вручную (`workflow_dispatch`), поскольку минуты платные. Не запускайте его без явного запроса. Commits исходной ветки и merge, меняющие triggers, используют `[skip ci]`, чтобы публикация этого изменения не создала run. Linux-бинарники для установки можно собрать отдельно в изолированном каталоге целевого хоста; такая сборка учитывается отдельно от локальных проверок.
+
 Export contract changes explicitly with cargo xtask contracts. Tests and --check never update tracked artifacts. Use focused integration-test files while developing; run the full applicable suite once before publication. Contract decoding and tooling are the #2 TDD seams. #4 tests events/commands through real temporary SQLite and a fake Telegram transport, plus process diagnostics and storage failures. Linux systemd effects require separate runtime evidence.
 
 Изменения контрактов экспортируются явно через cargo xtask contracts. Tests и --check не обновляют отслеживаемые артефакты. При разработке запускайте отдельные integration-test files; перед публикацией выполните полный применимый набор один раз. Seams TDD в #2: декодирование контрактов и tooling. В #4 события/команды проходят настоящий временный SQLite и подменённый Telegram transport; проверяются также процесс диагностики и отказы хранилища. Эффекты Linux systemd требуют отдельных runtime-проверок.

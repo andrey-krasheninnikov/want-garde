@@ -8,7 +8,7 @@
 
 Нужны systemd, исходящая HTTPS-связь с api.telegram.org и отдельный bot token. Webhook должен отсутствовать; сервис не удаляет его автоматически. Не запускайте другой polling-процесс с тем же токеном. Конфигурация проверяется до сети. Proxy-конфигурация относится к #14; текущий transport не использует proxy-переменные окружения и не меняет маршрут ОС.
 
-CI создаёт development artifact `linux-x86_64-<commit>` из точного SHA исходников. Это сборка Ubuntu 24.04 x86_64, без release tag и обещания совместимости с другими дистрибутивами. Получайте artifact только из workflow этого репозитория; сравните `revision` с проверенным SHA и выполните проверки контрольных сумм. Checksum подтверждает целостность, но сам по себе не подтверждает издателя.
+Ручной workflow CI создаёт development artifact `linux-x86_64-<commit>` из точного SHA исходников. Автозапуск отключён; обязательные проверки выполняются локально. Это сборка Ubuntu 24.04 x86_64, без release tag и обещания совместимости с другими дистрибутивами. Получайте artifact только из workflow этого репозитория; сравните `revision` с проверенным SHA и выполните проверки контрольных сумм. Checksum подтверждает целостность, но сам по себе не подтверждает издателя.
 
 ```sh
 sha256sum -c want-garde-linux-x86_64.tar.gz.sha256
@@ -72,7 +72,7 @@ The service runs on one Linux VPS with a dedicated Telegram bot token and HTTPS 
 
 Use systemd, outbound HTTPS access to api.telegram.org, and a dedicated token without a webhook. The service never removes a webhook automatically. Do not run another poller with the same token. Local configuration is checked before network access. Proxy configuration belongs to #14; the current transport ignores proxy environment variables and leaves OS routing unchanged.
 
-CI produces a development artifact named `linux-x86_64-<commit>` from the exact source SHA. It is an Ubuntu 24.04 x86_64 build, without a release tag or a compatibility promise for other distributions. Download only from this repository's workflow. Use the checksum and extraction commands above, inspect the archive entries before extraction, and compare `revision` with the reviewed full SHA. Checksums establish integrity, not publisher identity by themselves.
+The manual CI workflow produces a development artifact named `linux-x86_64-<commit>` from the exact source SHA. Automatic triggers are disabled; required checks run locally. It is an Ubuntu 24.04 x86_64 build, without a release tag or a compatibility promise for other distributions. Download only from this repository's workflow. Use the checksum and extraction commands above, inspect the archive entries before extraction, and compare `revision` with the reviewed full SHA. Checksums establish integrity, not publisher identity by themselves.
 
 The installation commands above apply to a new installation. Inspect any existing `want-garde` account, unit, or directory before reuse. Replace `<commit>` with the reviewed full SHA and `123456789` with your Telegram user ID. The commands create a separate system account, restricted configuration/token files, a private state directory, an immutable binary directory, and a `current` symlink. Enable the unit only after `--check-config` succeeds as the service user.
 
