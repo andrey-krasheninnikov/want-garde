@@ -8,6 +8,7 @@ use std::{fs, future::Future, path::PathBuf};
 pub mod delivery;
 pub mod host;
 pub mod runtime;
+pub mod ssh;
 pub mod telegram;
 
 pub trait StatusSource {
@@ -178,6 +179,13 @@ impl Bot {
         database: &runtime::Database,
         event: garde_contracts::Event,
     ) -> Result<()> {
+        let replies = self.event_replies(&event)?;
+        database
+            .call(move |store| store.publish(&event, &replies, runtime::now()))
+            .await
+    }
+
+    pub(crate) fn event_replies(&self, event: &garde_contracts::Event) -> Result<Vec<Reply>> {
         let reason = message(&self.locale, event.classification.reason_key.as_str());
         let reason = if reason == "message.unavailable" {
             event.classification.reason_key.as_str()
@@ -202,9 +210,7 @@ impl Bot {
             chat_id: self.config.owner()?.into(),
             text,
         }];
-        database
-            .call(move |store| store.publish(&event, &replies, runtime::now()))
-            .await
+        Ok(replies)
     }
 }
 

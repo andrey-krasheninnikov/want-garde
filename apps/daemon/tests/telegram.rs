@@ -24,6 +24,7 @@ async fn only_the_locally_bound_owner_receives_a_private_identifiable_snapshot()
         bot_token_file: dir.join("token"),
         state_dir: dir.clone(),
         default_locale: "ru".into(),
+        ssh: Default::default(),
         owner_user_id: Some("123456789".into()),
     };
     let mut bot = Bot::new(config).unwrap();
@@ -62,6 +63,7 @@ async fn language_selection_survives_restart_and_all_locales_render_unicode_stat
         bot_token_file: dir.join("token"),
         state_dir: dir.clone(),
         default_locale: "en".into(),
+        ssh: Default::default(),
         owner_user_id: Some("123456789".into()),
     };
     let command = |text: &str| json!({"message":{"from":{"id":123456789,"is_bot":false},"chat":{"id":123456789,"type":"private"},"text":text}});
@@ -119,6 +121,7 @@ async fn identity_in_message_text_and_an_untrusted_chat_never_grant_access() {
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().to_path_buf(),
         default_locale: "en".into(),
+        ssh: Default::default(),
         owner_user_id: Some("123456789".into()),
     };
     let mut bot = Bot::new(config).unwrap();

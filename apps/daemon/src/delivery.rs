@@ -307,6 +307,32 @@ impl Store {
     }
 
     pub fn publish(&mut self, event: &Event, replies: &[Reply], now: i64) -> Result<()> {
+        self.publish_checkpoint(Some(event), replies, now, None)
+    }
+
+    pub(crate) fn ssh_state(&self) -> Result<Option<String>> {
+        sql(self
+            .connection
+            .query_row("SELECT value FROM meta WHERE key='ssh.state'", [], |r| {
+                r.get(0)
+            })
+            .optional())
+    }
+
+    pub(crate) fn publish_checkpoint(
+        &mut self,
+        event: Option<&Event>,
+        replies: &[Reply],
+        now: i64,
+        checkpoint: Option<&str>,
+    ) -> Result<()> {
+        let Some(event) = event else {
+            let transaction = sql(self.connection.transaction())?;
+            if let Some(checkpoint) = checkpoint {
+                sql(transaction.execute("INSERT INTO meta VALUES('ssh.state',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",[checkpoint]))?;
+            }
+            return sql(transaction.commit());
+        };
         let payload = serde_json::to_string(event).map_err(|_| "event.invalid")?;
         let server: String =
             sql(self
@@ -330,11 +356,16 @@ impl Store {
             )
             .optional())?;
         if let Some(existing) = existing {
-            return if existing == payload {
-                Ok(())
-            } else {
-                Err("event.conflict")
-            };
+            let mut replay = event.clone();
+            if checkpoint.is_some() {
+                let saved: Event =
+                    serde_json::from_str(&existing).map_err(|_| "storage.corrupt")?;
+                replay.observed_at = saved.observed_at;
+            }
+            if serde_json::to_string(&replay).map_err(|_| "event.invalid")? != existing {
+                return Err("event.conflict");
+            }
+            return self.publish_checkpoint(None, &[], now, checkpoint);
         }
         self.admit(replies.len() as i64, now)?;
         let transaction = sql(self.connection.transaction())?;
@@ -351,6 +382,9 @@ impl Store {
                 now,
                 86400,
             )?;
+        }
+        if let Some(checkpoint) = checkpoint {
+            sql(transaction.execute("INSERT INTO meta VALUES('ssh.state',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",[checkpoint]))?;
         }
         sql(transaction.commit())
     }

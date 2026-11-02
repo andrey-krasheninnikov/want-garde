@@ -18,6 +18,21 @@ pub struct Config {
     pub state_dir: PathBuf,
     pub default_locale: String,
     pub owner_user_id: Option<String>,
+    #[serde(default)]
+    pub ssh: SshConfig,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
+pub enum SshConfig {
+    Auto {},
+    Journald {},
+    File { path: PathBuf },
+}
+impl Default for SshConfig {
+    fn default() -> Self {
+        Self::Auto {}
+    }
 }
 
 pub fn valid_user_id(value: &str) -> bool {
@@ -73,7 +88,8 @@ impl Config {
         }
         let value: Self =
             serde_json::from_slice(&read_private(path, 65536)?).map_err(|_| "config.invalid")?;
-        if !value.bot_token_file.is_absolute()
+        if matches!(&value.ssh, SshConfig::File { path } if !path.is_absolute() || path.components().any(|p| matches!(p, std::path::Component::ParentDir)) || path.as_os_str().len() > 4096)
+            || !value.bot_token_file.is_absolute()
             || !value.state_dir.is_absolute()
             || value.bot_token_file == path
             || !valid_locale(&value.default_locale)

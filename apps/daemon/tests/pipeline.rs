@@ -44,6 +44,7 @@ async fn an_event_passes_real_policy_and_sqlite_before_transport_delivery() {
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         default_locale: "en".into(),
+        ssh: Default::default(),
     };
     let bot = Bot::new(config.clone()).unwrap();
     let database = Database::open(config).await.unwrap();
@@ -91,6 +92,7 @@ async fn delivery_diagnostics_enforce_owner_access_and_all_locales_survive_queue
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         default_locale: "en".into(),
+        ssh: Default::default(),
     };
     let mut bot = Bot::new(config.clone()).unwrap();
     let database = Database::open(config.clone()).await.unwrap();
@@ -216,6 +218,7 @@ async fn a_slow_recipient_does_not_hold_delivery_to_another_recipient() {
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         default_locale: "en".into(),
+        ssh: Default::default(),
     };
     let database = Database::open(config).await.unwrap();
     let event: Event =
@@ -269,6 +272,7 @@ async fn a_fresh_status_command_after_an_idle_restart_reaches_the_outbox() {
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         default_locale: "en".into(),
+        ssh: Default::default(),
     };
     let old = garde_daemon::runtime::now() - 7 * 86400;
     let mut store =
