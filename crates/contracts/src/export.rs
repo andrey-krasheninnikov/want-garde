@@ -16,6 +16,7 @@ pub fn contract_artifacts() -> Result<BTreeMap<&'static str, String>, serde_json
     schema!("incident.schema.json", Incident);
     schema!("grant.schema.json", Grant);
     schema!("job.schema.json", Job);
+    schema!("host-snapshot.schema.json", HostSnapshot);
 
     let mut types = format!(
         "export const PRODUCT_VERSION = {:?} as const;\nexport const CONTRACT_VERSION = \"1\" as const;\n",
@@ -42,6 +43,9 @@ pub fn contract_artifacts() -> Result<BTreeMap<&'static str, String>, serde_json
         Capability,
         Scope,
         Grant,
+        Measurement<String>,
+        ByteUsage,
+        HostSnapshot,
         OperationResult,
         JobState,
         Job,

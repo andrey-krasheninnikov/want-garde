@@ -1,0 +1,38 @@
+{
+  "observed_at": "2026-01-01T00:00:00Z",
+  "hostname": {
+    "type": "available",
+    "value": "тест <host>"
+  },
+  "os": {
+    "type": "unavailable",
+    "reason_key": "source.read"
+  },
+  "kernel": {
+    "type": "available",
+    "value": "test"
+  },
+  "uptime_seconds": {
+    "type": "available",
+    "value": 0
+  },
+  "cpu_usage_percent": {
+    "type": "available",
+    "value": 0.0
+  },
+  "load_average": {
+    "type": "available",
+    "value": [0.0, 0.0, 0.0]
+  },
+  "memory": {
+    "type": "available",
+    "value": {
+      "total_bytes": 1048576,
+      "available_bytes": 524288
+    }
+  },
+  "root_disk": {
+    "type": "unavailable",
+    "reason_key": "source.read"
+  }
+}
