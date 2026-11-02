@@ -1,0 +1,29 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color-scheme: light dark;
+  --text-primary: light-dark(#202020, #ededed);
+  --surface: light-dark(#fafafa, #161616);
+  color: var(--text-primary);
+  background: var(--surface);
+}
+body {
+  margin: 0;
+}
+main {
+  max-inline-size: 40rem;
+  margin-inline: auto;
+  padding: 2rem 1rem;
+}
+h1 {
+  font-size: 2rem;
+}
+p {
+  line-height: 1.5;
+}
+select {
+  display: block;
+  max-inline-size: 100%;
+  padding: 0.5rem;
+  margin-block-start: 0.5rem;
+  font: inherit;
+}

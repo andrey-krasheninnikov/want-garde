@@ -1,0 +1,10 @@
+/target/
+/node_modules/
+**/node_modules/
+**/dist/
+**/.astro/
+.env
+.env.*
+!.env.example
+*.pem
+.DS_Store

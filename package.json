@@ -1,0 +1,30 @@
+{
+  "name": "want-garde",
+  "version": "0.1.0-dev.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=11 <12"
+  },
+  "workspaces": [
+    "apps/tma",
+    "apps/landing",
+    "packages/contracts",
+    "packages/i18n"
+  ],
+  "scripts": {
+    "format:check": "prettier --check .",
+    "check": "npm run check --workspaces --if-present",
+    "test": "node --test tests/*.test.mjs",
+    "build": "npm run build --workspaces --if-present",
+    "dev:tma": "npm run dev --workspace @want-garde/tma",
+    "dev:landing": "npm run dev --workspace @want-garde/landing"
+  },
+  "devDependencies": {
+    "prettier": "^3.0.0",
+    "prettier-plugin-astro": "^0.14.1",
+    "typescript": "6.0.3",
+    "@types/node": "^24.0.0"
+  }
+}

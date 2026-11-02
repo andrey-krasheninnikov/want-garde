@@ -1,0 +1,13 @@
+{
+  "version": "1",
+  "id": "incident-001",
+  "server_id": "server-demo",
+  "event_ids": ["event-001"],
+  "severity": "warning",
+  "state": {
+    "type": "closed",
+    "by": "telegram:123",
+    "at": "2026-01-01T00:00:00Z",
+    "reason": "Reviewed synthetic example"
+  }
+}

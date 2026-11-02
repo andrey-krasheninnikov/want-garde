@@ -8,7 +8,7 @@
 
 Want Garde: открытый self-hosted продукт для мониторинга состояния и безопасности VPS и управления сервером через Telegram. Каждая установка использует собственного бота и не зависит от центрального управляющего сервиса.
 
-**Статус: подготовка к реализации.** Репозиторий содержит правила работы, спецификацию и roadmap. Рабочий Rust-бот, bootstrap-установщик, TMA и лендинг ещё не выпущены.
+**Статус: архитектура и собираемый каркас.** Есть общие контракты, Rust entrypoints, React TMA и Astro-страницы разработки. Рабочий Rust-бот, bootstrap-установщик, TMA и лендинг ещё не выпущены.
 
 [Спецификация](https://github.com/andrey-krasheninnikov/want-garde/issues/1) · [Тикеты](https://github.com/andrey-krasheninnikov/want-garde/issues)
 
@@ -27,6 +27,8 @@ Want Garde: открытый self-hosted продукт для монитори�
 
 Интерфейсы и лендинг: `ru`, `en`, `zh-Hans`, `es`, `pt-BR`, `hi`, `ja`, `ar`, `he`, `tr`, `fr`, `de`, включая RTL для арабского и иврита. Документация, спецификация и тикеты ведутся на русском и английском.
 
+[Разработка](CONTRIBUTING.md) · [Архитектура](docs/architecture.md) · [Словарь](GLOSSARY.md)
+
 ### Работа с проектом
 
 Архитектура монорепозитория идёт первой. Bootstrap, TMA и лендинг находятся в конце roadmap. Работу начинают с тикета, чьи блокировки сняты; критерии приёмки находятся в GitHub Issues.
@@ -39,7 +41,7 @@ Want Garde: открытый self-hosted продукт для монитори�
 
 Want Garde is an open-source self-hosted product for VPS health and security monitoring and server management through Telegram. Each installation uses its own bot and does not depend on a central control service.
 
-**Status: implementation planning.** This repository contains workflow rules, the specification, and the roadmap. The working Rust bot, bootstrap installer, TMA, and landing page have not been released yet.
+**Status: architecture and buildable scaffold.** Shared contracts, Rust entrypoints, React TMA, and Astro development pages are available. The working Rust bot, bootstrap installer, TMA, and landing page have not been released yet.
 
 [Specification](https://github.com/andrey-krasheninnikov/want-garde/issues/1) · [Tickets](https://github.com/andrey-krasheninnikov/want-garde/issues)
 
@@ -57,6 +59,8 @@ Want Garde is an open-source self-hosted product for VPS health and security mon
 Target matrix: Debian, Ubuntu LTS, Rocky/AlmaLinux, Fedora, Arch, and openSUSE on x86_64/ARM64. Supported combinations will be verified on Linux VMs. The basic-profile target is a VPS with 1 vCPU and 512 MiB RAM; this is a requirement for future measurements.
 
 Interfaces and landing page: `ru`, `en`, `zh-Hans`, `es`, `pt-BR`, `hi`, `ja`, `ar`, `he`, `tr`, `fr`, and `de`, including Arabic and Hebrew RTL. Documentation, the specification, and tickets are maintained in Russian and English.
+
+[Development](CONTRIBUTING.md) · [Architecture](docs/architecture.md) · [Glossary](GLOSSARY.md)
 
 ### Working on the project
 

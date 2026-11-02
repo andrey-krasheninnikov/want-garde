@@ -1,0 +1,68 @@
+---
+import { PRODUCT_VERSION } from "@want-garde/contracts";
+import { locales, messages, type Locale } from "@want-garde/i18n";
+interface Props {
+  locale: Locale;
+}
+const { locale } = Astro.props;
+const copy = messages(locale);
+---
+
+<!doctype html>
+<html lang={locale} dir={copy.dir}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Want Garde</title>
+  </head>
+  <body>
+    <main>
+      <h1>Want Garde</h1>
+      <p>{copy.scaffold}</p>
+      <p><code>{PRODUCT_VERSION}</code></p>
+      <nav aria-label={copy.language}>
+        <ul>
+          {
+            locales.map((value) => (
+              <li>
+                <a href={`/${value}/`} lang={value} hreflang={value}>
+                  {messages(value).nativeName}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </nav>
+    </main>
+  </body>
+</html>
+<style>
+  :global(:root) {
+    font-family: system-ui, sans-serif;
+    color-scheme: light dark;
+    --text-primary: light-dark(#202020, #ededed);
+    --surface: light-dark(#fafafa, #161616);
+    color: var(--text-primary);
+    background: var(--surface);
+  }
+  :global(body) {
+    margin: 0;
+  }
+  main {
+    max-inline-size: 40rem;
+    margin-inline: auto;
+    padding: 2rem 1rem;
+  }
+  h1 {
+    font-size: 2rem;
+  }
+  p {
+    line-height: 1.5;
+  }
+  ul {
+    padding-inline-start: 1.5rem;
+  }
+  li {
+    margin-block: 0.5rem;
+  }
+</style>

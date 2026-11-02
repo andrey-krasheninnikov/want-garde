@@ -1,0 +1,138 @@
+[
+  {
+    "case": "unknown version",
+    "request": {
+      "version": "2",
+      "request_id": "request-001",
+      "server_id": "server-demo",
+      "action": {
+        "type": "server.status"
+      }
+    }
+  },
+  {
+    "case": "unknown action",
+    "request": {
+      "version": "1",
+      "request_id": "request-001",
+      "server_id": "server-demo",
+      "action": {
+        "type": "root.shell",
+        "command": "id"
+      }
+    }
+  },
+  {
+    "case": "action has unexpected arguments",
+    "request": {
+      "version": "1",
+      "request_id": "request-001",
+      "server_id": "server-demo",
+      "action": {
+        "type": "server.status",
+        "command": "id"
+      }
+    }
+  },
+  {
+    "case": "missing server",
+    "request": {
+      "version": "1",
+      "request_id": "request-001",
+      "action": {
+        "type": "server.status"
+      }
+    }
+  },
+  {
+    "case": "client supplies identity",
+    "request": {
+      "version": "1",
+      "request_id": "request-001",
+      "server_id": "server-demo",
+      "action": {
+        "type": "server.status"
+      },
+      "principal_id": "telegram:123"
+    }
+  },
+  {
+    "case": "client supplies capabilities",
+    "request": {
+      "version": "1",
+      "request_id": "request-001",
+      "server_id": "server-demo",
+      "action": {
+        "type": "server.status"
+      },
+      "capabilities": ["root.shell"]
+    }
+  },
+  {
+    "case": "client supplies approval",
+    "request": {
+      "version": "1",
+      "request_id": "request-001",
+      "server_id": "server-demo",
+      "action": {
+        "type": "server.status"
+      },
+      "approved": true
+    }
+  },
+  {
+    "case": "numeric identifier",
+    "request": {
+      "version": "1",
+      "request_id": 123,
+      "server_id": "server-demo",
+      "action": {
+        "type": "server.status"
+      }
+    }
+  },
+  {
+    "case": "empty identifier",
+    "request": {
+      "version": "1",
+      "request_id": "",
+      "server_id": "server-demo",
+      "action": {
+        "type": "server.status"
+      }
+    }
+  },
+  {
+    "case": "identifier contains whitespace",
+    "request": {
+      "version": "1",
+      "request_id": "request 001",
+      "server_id": "server-demo",
+      "action": {
+        "type": "server.status"
+      }
+    }
+  },
+  {
+    "case": "identifier is too long",
+    "request": {
+      "version": "1",
+      "request_id": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+      "server_id": "server-demo",
+      "action": {
+        "type": "server.status"
+      }
+    }
+  },
+  {
+    "case": "identifier contains Unicode",
+    "request": {
+      "version": "1",
+      "request_id": "запрос",
+      "server_id": "server-demo",
+      "action": {
+        "type": "server.status"
+      }
+    }
+  }
+]

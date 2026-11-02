@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Grant",
+  "type": "object",
+  "properties": {
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Capability"
+      }
+    },
+    "principal_id": {
+      "$ref": "#/$defs/Id"
+    },
+    "scope": {
+      "$ref": "#/$defs/Scope"
+    },
+    "version": {
+      "$ref": "#/$defs/WireVersion"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "principal_id",
+    "scope",
+    "capabilities"
+  ],
+  "$defs": {
+    "Capability": {
+      "type": "string",
+      "enum": [
+        "status.read",
+        "events.read",
+        "incidents.read"
+      ]
+    },
+    "Id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "Scope": {
+      "type": "object",
+      "properties": {
+        "allowed_chat_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "resource_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          }
+        },
+        "server_id": {
+          "$ref": "#/$defs/Id"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "server_id",
+        "resource_ids",
+        "allowed_chat_ids"
+      ]
+    },
+    "WireVersion": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    }
+  }
+}
