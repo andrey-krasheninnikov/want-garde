@@ -2,9 +2,9 @@
 
 ## Статус / Status
 
-Решения ниже задают направление реализации #2. Каркас не является работающей установкой: сборка и справка не доказывают мониторинг, авторизацию или поддержку Linux-дистрибутива. Функции добавляются по [roadmap](../README.md#roadmap--план-реализации).
+Архитектура описывает целевой продукт. В #3 реализованы приватный Telegram `/status`, локальная привязка владельца, выбор языка и ручной systemd-запуск. SQLite/outbox и остальные управляющие интерфейсы следуют по roadmap. Сборка сама по себе не подтверждает runtime-поддержку дистрибутива.
 
-These decisions govern #2. The scaffold is not an operational installation: compilation and help output do not prove monitoring, authorization, or Linux-distribution support. Features follow the [roadmap](../README.md#roadmap--план-реализации).
+The architecture describes the target product. #3 implements private Telegram `/status`, local owner binding, language selection, and manual systemd startup. SQLite/outbox and the remaining control interfaces follow the roadmap. Compilation alone does not establish distribution runtime support.
 
 ## Компоненты / Modules
 
@@ -18,9 +18,9 @@ These decisions govern #2. The scaffold is not an operational installation: comp
 | Astro landing | Static public information and future synthetic demo entry. / Статическая информация и будущий вход в синтетическое демо.                                                                                           | Shared locales; no server credentials. / Общие локали; без секретов сервера.                                      |
 | Integrations  | Portable operational skills and Warp packaging in later tickets. / Переносимые эксплуатационные skills и Warp в следующих тикетах.                                                                                 | Published CLI/MCP contract. / Опубликованный контракт CLI/MCP.                                                    |
 
-Rust application logic stays inside the daemon until another implemented consumer needs extraction. Contracts and entrypoint presentation are separate libraries because several applications consume them now. Do not create empty core, repository, plugin, or adapter libraries.
+Rust application logic stays inside the daemon until another implemented consumer needs extraction. Contracts, entrypoint presentation, and installation configuration are separate libraries because several applications consume them now. Do not create empty core, repository, plugin, or adapter libraries.
 
-Прикладная Rust-логика остаётся в daemon до появления второго реализованного потребителя. Контракты и представление entrypoints выделены, поскольку уже имеют несколько потребителей. Пустые библиотеки core, repository, plugin и adapters не создаются.
+Прикладная Rust-логика остаётся в daemon до появления второго реализованного потребителя. Контракты, представление entrypoints и конфигурация установки выделены, поскольку уже имеют несколько потребителей. Пустые библиотеки core, repository, plugin и adapters не создаются.
 
 ## Раскладка / Layout
 
@@ -73,9 +73,9 @@ Dangerous requests require expiring single-use approval and TOTP. Integration mu
 | runner     | Shell with pipes/redirection under a separate unprivileged user. / Shell с pipes/redirection под отдельным непривилегированным пользователем.                                                                                    | Bot/TOTP secrets, daemon data, Docker socket, sudo, PTY and interactive stdin. / Секреты бота/TOTP, данные daemon, Docker socket, sudo, PTY и интерактивный stdin.              |
 | web client | Authenticated, capability-filtered results. / Подтверждённые результаты с проверкой capabilities.                                                                                                                                | Bot token, TOTP secret, direct SQLite/helper access. / Bot token, TOTP secret, прямой доступ к SQLite/helper.                                                                   |
 
-The daemon is a trusted policy authority, not a sandbox against its own compromise. The helper limits privileged effect even when its caller is faulty; it must not treat JSON claims as authorization. Concrete helper IPC, approval persistence, TOTP enrollment, and systemd hardening are implemented and tested in #16. The scaffold opens no sockets and performs no operations.
+The daemon is a trusted policy authority, not a sandbox against its own compromise. The helper limits privileged effect even when its caller is faulty; it must not treat JSON claims as authorization. Concrete helper IPC, approval persistence, TOTP enrollment, and systemd hardening are implemented and tested in #16. The #3 daemon opens only outgoing Telegram connections; helper/MCP remain scaffolds.
 
-Daemon является доверенным центром политик, а не защитой от собственной компрометации. Helper ограничивает привилегированный эффект даже при ошибке вызывающего; утверждения в JSON не дают полномочий. Конкретные helper IPC, хранение подтверждений, TOTP enrollment и systemd hardening реализуются и проверяются в #16. Каркас не открывает sockets и не выполняет операций.
+Daemon является доверенным центром политик, а не защитой от собственной компрометации. Helper ограничивает привилегированный эффект даже при ошибке вызывающего; утверждения в JSON не дают полномочий. Конкретные helper IPC, хранение подтверждений, TOTP enrollment и systemd hardening реализуются и проверяются в #16. Daemon #3 открывает только исходящие Telegram connections; helper/MCP остаются каркасом.
 
 ## Состояние и ограничения / State and limits
 
@@ -102,3 +102,9 @@ Linux runtime verification belongs to #32: Debian, Ubuntu LTS, Rocky/AlmaLinux, 
 Проверка Linux runtime относится к #32: Debian, Ubuntu LTS, Rocky/AlmaLinux, Fedora, Arch, openSUSE; поддерживаются только проверенные сочетания x86_64/ARM64. Нативная сборка macOS и Ubuntu CI являются отдельными доказательствами.
 
 Shared formats are detailed in [wire contracts](contracts.md). / Общие форматы описаны в [wire-контрактах](contracts.md).
+
+## Initial runtime / Первая установка
+
+#3 stores the local owner in restricted installation configuration; the local CLI binds it. A small private preferences file stores the owner locale. SQLite and durable delivery arrive in #4. Status replies and polling offsets are transient; see [installation and limitations](installation.md).
+
+В #3 владелец хранится в закрытой конфигурации установки и привязывается локальным CLI. Небольшой закрытый файл предпочтений хранит язык владельца. SQLite и сохраняемая доставка добавляются в #4. Ответы на status и polling offsets пока не сохраняются; см. [установку и ограничения](installation.md).

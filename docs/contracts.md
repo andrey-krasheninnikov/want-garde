@@ -4,7 +4,7 @@
 
 Исходные Rust DTO находятся в crates/contracts. JSON Schema и TypeScript находятся в packages/contracts/generated. Команда cargo xtask contracts обновляет их; --check только сравнивает. Не редактируйте производные файлы вручную.
 
-Wire version передаётся строкой "1" и не совпадает с SemVer продукта. Запросы принимают только известные поля и действия. Единственное начальное действие: server.status без параметров. Его наличие в схеме не означает готовый runtime: все entrypoints пока завершают операционный запуск с not_implemented.
+Wire version передаётся строкой "1" и не совпадает с SemVer продукта. Запросы принимают только известные поля и действия. Единственное начальное действие: server.status без параметров. Daemon #3 реализует это действие для локально привязанного владельца в личном Telegram-чате. CLI реализует локальную привязку; helper/MCP остаются каркасом.
 
 ID являются непустыми ASCII-строками до 128 символов: первый символ буква или цифра, остальные также допускают точку, подчёркивание, двоеточие и дефис. Это сохраняет точность JavaScript. Telegram chat ID в Scope передаются отдельными десятичными строками; проверка подлинности и допустимости выполняется прикладной политикой в #15. Время событий и инцидентов имеет формат RFC 3339.
 
@@ -27,7 +27,7 @@ State/result являются discriminated unions. Success содержит т�
 
 Rust DTOs in crates/contracts own the contracts. JSON Schema and TypeScript live in packages/contracts/generated. Run cargo xtask contracts to update them; --check only compares. Never hand-edit derived files.
 
-Wire version is the string "1", distinct from product SemVer. Requests accept only known fields/actions. The initial action is server.status with no arguments. A schema entry does not imply a working runtime: all entrypoints currently fail operational startup with not_implemented.
+Wire version is the string "1", distinct from product SemVer. Requests accept only known fields/actions. The initial action is server.status with no arguments. The #3 daemon implements this action for the locally bound owner in a private Telegram chat. The CLI implements local binding; helper/MCP remain scaffolds.
 
 IDs are nonempty ASCII strings up to 128 characters: the first character is alphanumeric; remaining characters additionally allow dot, underscore, colon, and hyphen. This preserves JavaScript precision. Telegram chat IDs in Scope are separate decimal strings; application policy in #15 validates authenticity and permission. Event/incident timestamps use RFC 3339.
 
@@ -45,3 +45,13 @@ State/result are discriminated unions. Success carries a typed result; failure c
 Before adding a feature, add its typed action/result and capabilities. Changes to the current strict DTOs require compatibility analysis and an explicit wire-version decision. Old readers need not accept new fields. TypeScript provides compile-time help, not network-data validation; the server always decodes and validates input.
 
 Fixtures in fixtures/contracts are synthetic. Serialization, JSON Schema, and TypeScript checks use public contracts. Initial authorization, TOTP, SQLite, job persistence, and transport adapters arrive in later tickets.
+
+## Host snapshot / Снимок хоста
+
+The server_status result contains server_id, product_version, and a timestamped HostSnapshot. Each measurement is available with a typed value or unavailable with a stable reason_key. Byte counts use JSON numbers below 2^53; IDs remain strings. CPU is percent, load is the 1/5/15-minute tuple, uptime is seconds, memory/disk are total and available bytes.
+
+Результат server_status содержит server_id, product_version и HostSnapshot со временем. Каждый показатель имеет типизированное значение available либо unavailable со стабильным reason_key. Объёмы передаются JSON-числами меньше 2^53; ID остаются строками. CPU измеряется в процентах, load содержит 1/5/15 минут, uptime передаётся в секундах, RAM/диск содержат общий и доступный объём в bytes.
+
+By explicit pre-release decision, this extends wire version "1" without a version bump. Old strict scaffold readers cannot decode the new status result. Update Rust, JSON Schema, TypeScript, fixtures, and consumers together; compatibility with the earlier unpublished scaffold is not promised.
+
+По согласованному решению до первого релиза wire version "1" развивается без смены номера. Старые строгие readers каркаса не прочитают новый результат статуса. Rust, JSON Schema, TypeScript, fixtures и потребители обновляются вместе; совместимость с прежним невыпущенным каркасом не обещается.

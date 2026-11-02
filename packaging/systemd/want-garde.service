@@ -1,0 +1,38 @@
+[Unit]
+Description=Want Garde host status
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=want-garde
+Group=want-garde
+ExecStartPre=/usr/local/lib/want-garde/current/want-garde-daemon --check-config --config /etc/want-garde/config.json
+ExecStart=/usr/local/lib/want-garde/current/want-garde-daemon --config /etc/want-garde/config.json
+Restart=on-failure
+RestartPreventExitStatus=2
+RestartSec=5
+TimeoutStopSec=15
+UMask=0077
+StateDirectory=want-garde
+StateDirectoryMode=0700
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
