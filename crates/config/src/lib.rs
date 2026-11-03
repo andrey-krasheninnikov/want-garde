@@ -1,4 +1,6 @@
+mod host;
 use garde_contracts::Id;
+pub use host::HostHealthConfig;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File, OpenOptions},
@@ -24,6 +26,8 @@ pub struct Config {
     pub fail2ban: LogConfig,
     #[serde(default)]
     pub firewall: FirewallConfig,
+    #[serde(default)]
+    pub host_health: HostHealthConfig,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -104,7 +108,8 @@ impl Config {
         let value: Self =
             serde_json::from_slice(&read_private(path, 65536)?).map_err(|_| "config.invalid")?;
         let valid_source = |source: &SshConfig| !matches!(source, SshConfig::File { path } if !path.is_absolute() || path.components().any(|p| matches!(p, std::path::Component::ParentDir)) || path.as_os_str().len() > 4096);
-        if !valid_source(&value.ssh)
+        if !value.host_health.valid()
+            || !valid_source(&value.ssh)
             || !valid_source(&value.fail2ban)
             || !valid_source(&value.firewall.source)
             || value.firewall.log_prefix.as_ref().is_some_and(|p| {

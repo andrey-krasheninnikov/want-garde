@@ -10,6 +10,7 @@ fn delivery_diagnostics_are_read_only_json_and_work_without_a_token() {
         state_dir: dir.path().into(),
         fail2ban: Default::default(),
         firewall: Default::default(),
+        host_health: Default::default(),
         default_locale: "en".into(),
         ssh: Default::default(),
         owner_user_id: Some("123456789".into()),

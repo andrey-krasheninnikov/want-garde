@@ -99,3 +99,9 @@ The service reads the system journal through `SupplementaryGroups=systemd-journa
 ## Firewall / Firewall
 
 Сбор, live `/bans`, права adm и read helper описаны в [firewall/fail2ban](firewall.md). / See [firewall/fail2ban](firewall.md) for collection, live `/bans`, adm access and the read helper.
+
+## Host health / Состояние хоста
+
+See [host health](host-health.md) for filesystem paths, thresholds, reboot detection, and `--host-status`.
+
+Пути файловых систем, пороги, проверка reboot и `--host-status` описаны в [состоянии хоста](host-health.md).

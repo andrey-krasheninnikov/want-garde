@@ -413,6 +413,89 @@ impl Store {
         sql(transaction.commit())
     }
 
+    pub(crate) fn host_state(&self) -> Result<Option<String>> {
+        sql(self
+            .connection
+            .query_row("SELECT value FROM meta WHERE key='host.state'", [], |r| {
+                r.get(0)
+            })
+            .optional())
+    }
+    pub(crate) fn publish_host(
+        &mut self,
+        previous: Option<&str>,
+        state: &str,
+        publications: &[(Event, Vec<Reply>)],
+        now: i64,
+    ) -> Result<()> {
+        crate::host_health::validate_state(state)?;
+        if self.host_state()?.as_deref() != previous {
+            return Err("host.state_changed");
+        }
+        let server: String =
+            sql(self
+                .connection
+                .query_row("SELECT value FROM meta WHERE key='server'", [], |r| {
+                    r.get(0)
+                }))?;
+        let mut events = Vec::new();
+        let mut count = 0;
+        for (event, replies) in publications {
+            let payload = serde_json::to_string(event).map_err(|_| "event.invalid")?;
+            if event.server_id.as_str() != server || payload.len() > 65536 || replies.len() > 32 {
+                return Err("event.invalid");
+            }
+            count += replies.len();
+            events.push(payload);
+        }
+        if publications.len() > 40 || count > 40 || now < 0 {
+            return Err("event.invalid");
+        }
+        self.admit(count as i64, now)?;
+        let transaction = sql(self.connection.transaction())?;
+        for ((event, replies), payload) in publications.iter().zip(events) {
+            sql(transaction.execute(
+                "INSERT INTO events VALUES(?1,?2,?3)",
+                params![event.id.as_str(), payload, now],
+            ))?;
+            for reply in replies {
+                enqueue(
+                    &transaction,
+                    Some(event.id.as_str()),
+                    None,
+                    reply,
+                    now,
+                    86400,
+                )?;
+            }
+        }
+        sql(transaction.execute("INSERT INTO meta VALUES('host.state',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",[state]))?;
+        sql(transaction.commit())
+    }
+    pub fn host_health(
+        &self,
+        config: &garde_config::Config,
+        now: i64,
+    ) -> Result<garde_contracts::HostHealth> {
+        crate::host_health::health(config, self.host_state()?.as_deref(), now)
+    }
+    pub fn inspect_host(
+        config: &garde_config::Config,
+        now: i64,
+    ) -> Result<garde_contracts::HostHealth> {
+        let connection = inspect_connection(
+            &config.state_dir,
+            config.server_id.as_str(),
+            config.owner()?,
+        )?;
+        let raw: Option<String> = sql(connection
+            .query_row("SELECT value FROM meta WHERE key='host.state'", [], |r| {
+                r.get(0)
+            })
+            .optional())?;
+        crate::host_health::health(config, raw.as_deref(), now)
+    }
+
     pub fn claim(&mut self, now: i64) -> Result<Option<Delivery>> {
         self.maintenance(now)?;
         let transaction = sql(self.connection.transaction())?;

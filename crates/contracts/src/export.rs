@@ -17,6 +17,7 @@ pub fn contract_artifacts() -> Result<BTreeMap<&'static str, String>, serde_json
     schema!("grant.schema.json", Grant);
     schema!("job.schema.json", Job);
     schema!("host-snapshot.schema.json", HostSnapshot);
+    schema!("host-health.schema.json", HostHealth);
     schema!("delivery-health.schema.json", DeliveryHealth);
 
     schema!("ssh-health.schema.json", SshHealth);
@@ -52,6 +53,12 @@ pub fn contract_artifacts() -> Result<BTreeMap<&'static str, String>, serde_json
         Measurement<String>,
         ByteUsage,
         HostSnapshot,
+        DiskUsage,
+        InodeUsage,
+        DiskMeasurement,
+        HostLevel,
+        HostAlert,
+        HostHealth,
         DeliveryState,
         DeliveryProblem,
         DeliveryHealth,

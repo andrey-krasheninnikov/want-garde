@@ -8,6 +8,7 @@ use std::{fs, future::Future, path::PathBuf};
 pub mod delivery;
 pub mod firewall;
 pub mod host;
+pub mod host_health;
 pub mod ingest;
 pub mod runtime;
 pub mod ssh;
@@ -259,7 +260,19 @@ impl Bot {
                         message(&self.locale, evidence.name.as_str())
                     }
                 ),
-                isolate(&evidence.value)
+                isolate(if evidence.name.as_str() == "host_metric" {
+                    message(
+                        &self.locale,
+                        match evidence.value.as_str() {
+                            "disk" => "host_disk",
+                            "inode" => "host_inode",
+                            "reboot" => "host_reboot",
+                            value => value,
+                        },
+                    )
+                } else {
+                    &evidence.value
+                })
             ));
         }
         let replies = vec![Reply {
@@ -443,7 +456,10 @@ fn render_status(result: &OperationResult, locale: &str) -> String {
             v[0], v[1], v[2]
         ))
     ));
-    for (key, value) in [("memory", &s.memory), ("root_disk", &s.root_disk)] {
+    for (key, value) in [("memory", &s.memory)]
+        .into_iter()
+        .chain(s.disks.is_empty().then_some(("root_disk", &s.root_disk)))
+    {
         lines.push(format!(
             "{}: {}",
             message(locale, key),
@@ -455,6 +471,55 @@ fn render_status(result: &OperationResult, locale: &str) -> String {
             ))
         ));
     }
+    lines.push(format!(
+        "{}: {}",
+        message(locale, "host_cpu_count"),
+        reading(&s.cpu_count, locale, |v| v.to_string())
+    ));
+    lines.push(format!(
+        "{} (1/5/15 min): {}",
+        message(locale, "host_load_per_core"),
+        reading(&s.load_per_core, locale, |v| format!(
+            "{:.2} / {:.2} / {:.2}",
+            v[0], v[1], v[2]
+        ))
+    ));
+    for disk in s.disks.iter().take(8) {
+        lines.push(format!(
+            "{} {}: {}",
+            message(locale, "host_disk"),
+            isolate(&disk.path),
+            reading(&disk.space, locale, |v| format!(
+                "{} / {} MiB; {:.1}%",
+                v.available_bytes / 1048576,
+                v.total_bytes / 1048576,
+                100.0 * v.used_bytes as f64 / v.total_bytes.max(1) as f64
+            ))
+        ));
+        lines.push(format!(
+            "{}: {}",
+            message(locale, "host_inode"),
+            reading(&disk.inodes, locale, |v| format!(
+                "{} / {}; {:.1}%",
+                v.available,
+                v.total,
+                100.0 * v.total.saturating_sub(v.available) as f64 / v.total.max(1) as f64
+            ))
+        ));
+    }
+    lines.push(format!(
+        "{}: {}",
+        message(locale, "host_reboot"),
+        reading(&s.reboot_required, locale, |v| message(
+            locale,
+            if *v {
+                "host_required"
+            } else {
+                "host_not_required"
+            }
+        )
+        .into())
+    ));
     lines.join("\n")
 }
 

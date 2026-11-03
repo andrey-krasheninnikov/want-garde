@@ -97,3 +97,7 @@ _Avoid_: Event / Событие, когда речь об отправке со�
 **Jail / Jail fail2ban**
 
 Именованный набор правил обнаружения и блокировок fail2ban с текущим списком заблокированных адресов. Просмотр jail не даёт разрешения на unban. / A named fail2ban detection and banning configuration with a current list of banned addresses. Reading a jail grants no unban authority.
+
+**Resource threshold / Порог ресурса**
+
+Проверяемая граница показателя хоста с сохраняемым состоянием warning/critical и отдельным восстановлением. / A host measurement limit with durable warning/critical state and separate recovery.

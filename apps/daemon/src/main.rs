@@ -34,11 +34,12 @@ async fn run() -> ExitCode {
     }
     if args == ["--help"] {
         println!(
-            "{}: want-garde-daemon [--lang LOCALE] [--check-config | --delivery-status | --ssh-status | --firewall-status] --config PATH",
+            "{}: want-garde-daemon [--lang LOCALE] [--check-config | --delivery-status | --ssh-status | --firewall-status | --host-status] --config PATH",
             message(locale, "usage")
         );
         return ExitCode::SUCCESS;
     }
+    let host_diagnostic = args.first().is_some_and(|s| s == "--host-status");
     let (check, diagnostic, ssh_diagnostic, firewall_diagnostic, path) = match args {
         [flag, path] if flag == "--config" => (false, false, false, false, path),
         [check, flag, path] if check == "--check-config" && flag == "--config" => {
@@ -50,6 +51,9 @@ async fn run() -> ExitCode {
         [diagnostic, flag, path] if diagnostic == "--ssh-status" && flag == "--config" => {
             (false, false, true, false, path)
         }
+        [diagnostic, flag, path] if diagnostic == "--host-status" && flag == "--config" => {
+            (false, false, false, false, path)
+        }
         [diagnostic, flag, path] if diagnostic == "--firewall-status" && flag == "--config" => {
             (false, false, false, true, path)
         }
@@ -59,14 +63,14 @@ async fn run() -> ExitCode {
         }
     };
     let config = match Config::load(Path::new(path)).and_then(|c| {
-        if !diagnostic && !ssh_diagnostic && !firewall_diagnostic {
+        if !host_diagnostic && !diagnostic && !ssh_diagnostic && !firewall_diagnostic {
             c.validate_runtime()?;
         }
         Ok(c)
     }) {
         Ok(config) => config,
         Err(code) => {
-            if diagnostic || ssh_diagnostic || firewall_diagnostic {
+            if host_diagnostic || diagnostic || ssh_diagnostic || firewall_diagnostic {
                 return diagnostic_error(code);
             }
             eprintln!("{code}: {}", message(locale, "operation_failed"));
@@ -75,6 +79,25 @@ async fn run() -> ExitCode {
     };
     if !explicit_locale {
         locale = &config.default_locale;
+    }
+    if host_diagnostic {
+        return match garde_daemon::delivery::Store::inspect_host(
+            &config,
+            garde_daemon::runtime::now(),
+        ) {
+            Ok(health) => match serde_json::to_string(&health) {
+                Ok(json) => {
+                    println!("{json}");
+                    if garde_daemon::host_health::healthy(&health) {
+                        ExitCode::SUCCESS
+                    } else {
+                        ExitCode::from(1)
+                    }
+                }
+                Err(_) => diagnostic_error("host.state"),
+            },
+            Err(code) => diagnostic_error(code),
+        };
     }
     if firewall_diagnostic {
         return match garde_daemon::delivery::Store::inspect_firewall(

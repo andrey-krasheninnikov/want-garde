@@ -79,6 +79,10 @@ fn schemas_match_valid_examples_and_reject_the_negative_request_corpus() {
             include_str!("../../../fixtures/contracts/helper-response.json"),
         ),
         (
+            "host-health",
+            include_str!("../../../fixtures/contracts/host-health.json"),
+        ),
+        (
             "host-snapshot",
             include_str!("../../../fixtures/contracts/host-snapshot.json"),
         ),

@@ -243,6 +243,11 @@ pub async fn serve(config: Config) -> Result<()> {
             Some(startup)
         }
     };
+    let source = LinuxHost::with_sources(
+        crate::host::HostSources::default(),
+        config.host_health.disk_paths.clone(),
+    );
+    let mut host = crate::host_health::Monitor::new(config.clone(), database.clone());
     let mut collector = crate::ssh::Collector::new(config.clone(), database.clone());
     let mut fail2ban = crate::ingest::Collector::for_source(
         crate::ingest::Kind::Fail2ban,
@@ -254,43 +259,48 @@ pub async fn serve(config: Config) -> Result<()> {
         config.clone(),
         database.clone(),
     );
-    tokio::try_join!(collector.run(), fail2ban.run(), firewall.run(), async {
-        let mut delay = 1u64;
-        let identity = loop {
-            match transport.identity().await {
-                Ok(identity) => break identity,
-                Err(error) if error.kind == FailureKind::Fatal => return Err(error.code),
-                Err(error) => {
-                    eprintln!(
-                        "{}: {}",
-                        error.code,
-                        message(&config.default_locale, "operation_failed")
-                    );
-                    tokio::time::sleep(Duration::from_secs(delay).max(error.retry_after)).await;
-                    delay = (delay * 2).min(30);
+    tokio::try_join!(
+        host.run(&source),
+        collector.run(),
+        fail2ban.run(),
+        firewall.run(),
+        async {
+            let mut delay = 1u64;
+            let identity = loop {
+                match transport.identity().await {
+                    Ok(identity) => break identity,
+                    Err(error) if error.kind == FailureKind::Fatal => return Err(error.code),
+                    Err(error) => {
+                        eprintln!(
+                            "{}: {}",
+                            error.code,
+                            message(&config.default_locale, "operation_failed")
+                        );
+                        tokio::time::sleep(Duration::from_secs(delay).max(error.retry_after)).await;
+                        delay = (delay * 2).min(30);
+                    }
                 }
-            }
-        };
-        database
-            .call(move |store| store.bind_bot(&identity.id))
-            .await?;
-        eprintln!(
-            "service.ready: {}",
-            message(&config.default_locale, "service_ready")
-        );
-        let source = LinuxHost::default();
-        tokio::try_join!(
-            poll_loop(
-                bot,
-                database.clone(),
-                transport.clone(),
-                &source,
-                &identity.username,
-                startup
-            ),
-            send_loop(database, transport)
-        )?;
-        Ok(())
-    })?;
+            };
+            database
+                .call(move |store| store.bind_bot(&identity.id))
+                .await?;
+            eprintln!(
+                "service.ready: {}",
+                message(&config.default_locale, "service_ready")
+            );
+            tokio::try_join!(
+                poll_loop(
+                    bot,
+                    database.clone(),
+                    transport.clone(),
+                    &source,
+                    &identity.username,
+                    startup
+                ),
+                send_loop(database, transport)
+            )?;
+            Ok(())
+        }
+    )?;
     Ok(())
 }

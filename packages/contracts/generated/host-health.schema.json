@@ -1,0 +1,589 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HostHealth",
+  "type": "object",
+  "properties": {
+    "alerts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/HostAlert"
+      }
+    },
+    "checked_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "reason_key": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "server_id": {
+      "$ref": "#/$defs/Id"
+    },
+    "snapshot": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/HostSnapshot"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "stale": {
+      "type": "boolean"
+    },
+    "version": {
+      "$ref": "#/$defs/WireVersion"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "server_id",
+    "observed_at",
+    "enabled",
+    "stale",
+    "alerts"
+  ],
+  "$defs": {
+    "ByteUsage": {
+      "type": "object",
+      "properties": {
+        "available_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "total_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "total_bytes",
+        "available_bytes"
+      ]
+    },
+    "DiskMeasurement": {
+      "type": "object",
+      "properties": {
+        "inodes": {
+          "$ref": "#/$defs/Measurement7"
+        },
+        "path": {
+          "type": "string"
+        },
+        "space": {
+          "$ref": "#/$defs/Measurement6"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "space",
+        "inodes"
+      ]
+    },
+    "DiskUsage": {
+      "type": "object",
+      "properties": {
+        "available_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "total_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "used_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "total_bytes",
+        "used_bytes",
+        "available_bytes"
+      ]
+    },
+    "HostAlert": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "$ref": "#/$defs/HostLevel"
+        },
+        "metric": {
+          "$ref": "#/$defs/Id"
+        },
+        "reason_key": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resource": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "metric",
+        "level"
+      ]
+    },
+    "HostLevel": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "warning",
+        "critical"
+      ]
+    },
+    "HostSnapshot": {
+      "type": "object",
+      "properties": {
+        "cpu_count": {
+          "$ref": "#/$defs/Measurement2",
+          "default": {
+            "reason_key": "source.unavailable",
+            "type": "unavailable"
+          }
+        },
+        "cpu_usage_percent": {
+          "$ref": "#/$defs/Measurement3"
+        },
+        "disks": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/DiskMeasurement"
+          }
+        },
+        "hostname": {
+          "$ref": "#/$defs/Measurement"
+        },
+        "kernel": {
+          "$ref": "#/$defs/Measurement"
+        },
+        "load_average": {
+          "$ref": "#/$defs/Measurement4"
+        },
+        "load_per_core": {
+          "$ref": "#/$defs/Measurement4",
+          "default": {
+            "reason_key": "source.unavailable",
+            "type": "unavailable"
+          }
+        },
+        "memory": {
+          "$ref": "#/$defs/Measurement5"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "os": {
+          "$ref": "#/$defs/Measurement"
+        },
+        "reboot_required": {
+          "$ref": "#/$defs/Measurement8",
+          "default": {
+            "reason_key": "source.unavailable",
+            "type": "unavailable"
+          }
+        },
+        "root_disk": {
+          "$ref": "#/$defs/Measurement5"
+        },
+        "uptime_seconds": {
+          "$ref": "#/$defs/Measurement2"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "observed_at",
+        "hostname",
+        "os",
+        "kernel",
+        "uptime_seconds",
+        "cpu_usage_percent",
+        "load_average",
+        "memory",
+        "root_disk"
+      ]
+    },
+    "Id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "InodeUsage": {
+      "type": "object",
+      "properties": {
+        "available": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "total": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "total",
+        "available"
+      ]
+    },
+    "Measurement": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "available"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "reason_key": {
+              "$ref": "#/$defs/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "unavailable"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "reason_key"
+          ]
+        }
+      ]
+    },
+    "Measurement2": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "available"
+            },
+            "value": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "reason_key": {
+              "$ref": "#/$defs/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "unavailable"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "reason_key"
+          ]
+        }
+      ]
+    },
+    "Measurement3": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "available"
+            },
+            "value": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "reason_key": {
+              "$ref": "#/$defs/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "unavailable"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "reason_key"
+          ]
+        }
+      ]
+    },
+    "Measurement4": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "available"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "format": "double"
+              },
+              "maxItems": 3,
+              "minItems": 3
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "reason_key": {
+              "$ref": "#/$defs/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "unavailable"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "reason_key"
+          ]
+        }
+      ]
+    },
+    "Measurement5": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "available"
+            },
+            "value": {
+              "$ref": "#/$defs/ByteUsage"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "reason_key": {
+              "$ref": "#/$defs/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "unavailable"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "reason_key"
+          ]
+        }
+      ]
+    },
+    "Measurement6": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "available"
+            },
+            "value": {
+              "$ref": "#/$defs/DiskUsage"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "reason_key": {
+              "$ref": "#/$defs/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "unavailable"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "reason_key"
+          ]
+        }
+      ]
+    },
+    "Measurement7": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "available"
+            },
+            "value": {
+              "$ref": "#/$defs/InodeUsage"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "reason_key": {
+              "$ref": "#/$defs/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "unavailable"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "reason_key"
+          ]
+        }
+      ]
+    },
+    "Measurement8": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "available"
+            },
+            "value": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "reason_key": {
+              "$ref": "#/$defs/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "unavailable"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "reason_key"
+          ]
+        }
+      ]
+    },
+    "WireVersion": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    }
+  }
+}
