@@ -433,12 +433,14 @@ fn isolate(value: &str) -> String {
     format!("\u{2068}{text}\u{2069}")
 }
 fn isolate_evidence(value: &str) -> String {
-    // Eight byte-bounded values must fit Telegram's UTF-16 message limit.
+    // Preserve Unicode values while bounding Telegram's UTF-16 message size.
     let mut text = String::new();
+    let mut units = 0;
     for c in presentation_chars(value) {
-        if text.len() + c.len_utf8() > 255 {
+        if units + c.len_utf16() > 256 {
             break;
         }
+        units += c.len_utf16();
         text.push(c);
     }
     format!("\u{2068}{text}\u{2069}")

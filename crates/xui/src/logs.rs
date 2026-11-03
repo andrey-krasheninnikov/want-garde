@@ -116,7 +116,7 @@ fn drain(
     p: &mut XuiFilePosition,
     kind: &LogKind,
     at: i64,
-    batch: &mut XuiLogBatch,
+    records: &mut Vec<garde_contracts::XuiLogRecord>,
     gap: &mut bool,
     finalized: bool,
 ) -> Result<bool> {
@@ -131,7 +131,7 @@ fn drain(
         .map_err(|_| "xui.access")?;
     let mut reader = BufReader::new(f.take(65536));
     let mut consumed = 0;
-    while consumed < 65536 && batch.records.len() < 256 {
+    while consumed < 65536 && records.len() < 64 {
         let mut line = vec![];
         let read = reader
             .read_until(b'\n', &mut line)
@@ -178,7 +178,7 @@ fn drain(
             position.as_bytes(),
             at,
         ) {
-            batch.records.push(record)
+            records.push(record)
         }
     }
     let f = reader.into_inner().into_inner();
@@ -204,7 +204,7 @@ pub fn files(paths: &[LogFile], checkpoint: &XuiCheckpoint, at: i64) -> Result<X
         let old = checkpoint.files.iter().find(|p| p.slot == slot);
         let mut gap = false;
         let mut backlog = false;
-        let before = batch.records.len();
+        let mut records = vec![];
         let result = (|| {
             let mut current = open(&source.path)?;
             let m = current.metadata().map_err(|_| "xui.access")?;
@@ -219,7 +219,7 @@ pub fn files(paths: &[LogFile], checkpoint: &XuiCheckpoint, at: i64) -> Result<X
                         &mut position,
                         &source.kind,
                         at,
-                        &mut batch,
+                        &mut records,
                         &mut gap,
                         true,
                     )? {
@@ -241,12 +241,12 @@ pub fn files(paths: &[LogFile], checkpoint: &XuiCheckpoint, at: i64) -> Result<X
                 &mut position,
                 &source.kind,
                 at,
-                &mut batch,
+                &mut records,
                 &mut gap,
                 false,
             )?;
             backlog = !ended
-                && (batch.records.len() >= 256
+                && (records.len() >= 64
                     || current
                         .metadata()
                         .map_err(|_| "xui.access")?
@@ -257,6 +257,7 @@ pub fn files(paths: &[LogFile], checkpoint: &XuiCheckpoint, at: i64) -> Result<X
         })();
         let reason = match result {
             Ok(position) => {
+                batch.records.extend(records);
                 batch.checkpoint.files.retain(|p| p.slot != slot);
                 batch.checkpoint.files.push(position);
                 if backlog {
@@ -265,10 +266,7 @@ pub fn files(paths: &[LogFile], checkpoint: &XuiCheckpoint, at: i64) -> Result<X
                     None
                 }
             }
-            Err(code) => {
-                batch.records.truncate(before);
-                Some(Id::new(code)?)
-            }
+            Err(code) => Some(Id::new(code)?),
         };
         batch.sources.push(XuiSourceHealth {
             source: Id::new(format!("xui.file-{slot}"))?,

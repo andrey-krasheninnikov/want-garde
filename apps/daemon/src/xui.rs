@@ -658,7 +658,14 @@ pub fn render(h: &XuiHealth, page: usize, locale: &str) -> String {
     for source in &h.sources {
         title.push_str(&format!(
             "\n{}: {}",
-            message(locale, source.source.as_str()),
+            message(
+                locale,
+                if source.source.as_str() == "xui.journal" {
+                    "xui_journal_source"
+                } else {
+                    source.source.as_str()
+                }
+            ),
             source
                 .reason_key
                 .as_ref()

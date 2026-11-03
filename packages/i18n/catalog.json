@@ -180,7 +180,8 @@
       "xui.checkpoint": "Операция не выполнена. (xui.checkpoint)",
       "xui.state": "Операция не выполнена. (xui.state)",
       "xui.clock": "Операция не выполнена. (xui.clock)",
-      "xui.backlog": "Остались непрочитанные записи"
+      "xui.backlog": "Остались непрочитанные записи",
+      "xui_journal_source": "Журнал панели"
     },
     "en": {
       "nativeName": "English",
@@ -361,7 +362,8 @@
       "xui.checkpoint": "Operation failed. (xui.checkpoint)",
       "xui.state": "Operation failed. (xui.state)",
       "xui.clock": "Operation failed. (xui.clock)",
-      "xui.backlog": "Unread records remain"
+      "xui.backlog": "Unread records remain",
+      "xui_journal_source": "Panel journal"
     },
     "zh-Hans": {
       "nativeName": "简体中文",
@@ -542,7 +544,8 @@
       "xui.checkpoint": "操作失败。 (xui.checkpoint)",
       "xui.state": "操作失败。 (xui.state)",
       "xui.clock": "操作失败。 (xui.clock)",
-      "xui.backlog": "仍有未读取的记录"
+      "xui.backlog": "仍有未读取的记录",
+      "xui_journal_source": "面板日志"
     },
     "es": {
       "nativeName": "Español",
@@ -723,7 +726,8 @@
       "xui.checkpoint": "La operación falló. (xui.checkpoint)",
       "xui.state": "La operación falló. (xui.state)",
       "xui.clock": "La operación falló. (xui.clock)",
-      "xui.backlog": "Quedan registros sin leer"
+      "xui.backlog": "Quedan registros sin leer",
+      "xui_journal_source": "Registro del panel"
     },
     "pt-BR": {
       "nativeName": "Português (Brasil)",
@@ -904,7 +908,8 @@
       "xui.checkpoint": "A operação falhou. (xui.checkpoint)",
       "xui.state": "A operação falhou. (xui.state)",
       "xui.clock": "A operação falhou. (xui.clock)",
-      "xui.backlog": "Há registros não lidos"
+      "xui.backlog": "Há registros não lidos",
+      "xui_journal_source": "Registro do painel"
     },
     "hi": {
       "nativeName": "हिन्दी",
@@ -1085,7 +1090,8 @@
       "xui.checkpoint": "कार्रवाई विफल हुई। (xui.checkpoint)",
       "xui.state": "कार्रवाई विफल हुई। (xui.state)",
       "xui.clock": "कार्रवाई विफल हुई। (xui.clock)",
-      "xui.backlog": "कुछ रिकॉर्ड अभी पढ़े नहीं गए"
+      "xui.backlog": "कुछ रिकॉर्ड अभी पढ़े नहीं गए",
+      "xui_journal_source": "पैनल जर्नल"
     },
     "ja": {
       "nativeName": "日本語",
@@ -1266,7 +1272,8 @@
       "xui.checkpoint": "操作に失敗しました。 (xui.checkpoint)",
       "xui.state": "操作に失敗しました。 (xui.state)",
       "xui.clock": "操作に失敗しました。 (xui.clock)",
-      "xui.backlog": "未読のレコードがあります"
+      "xui.backlog": "未読のレコードがあります",
+      "xui_journal_source": "パネルジャーナル"
     },
     "ar": {
       "nativeName": "العربية",
@@ -1447,7 +1454,8 @@
       "xui.checkpoint": "فشلت العملية. (xui.checkpoint)",
       "xui.state": "فشلت العملية. (xui.state)",
       "xui.clock": "فشلت العملية. (xui.clock)",
-      "xui.backlog": "توجد سجلات لم تُقرأ بعد"
+      "xui.backlog": "توجد سجلات لم تُقرأ بعد",
+      "xui_journal_source": "سجل اللوحة"
     },
     "he": {
       "nativeName": "עברית",
@@ -1628,7 +1636,8 @@
       "xui.checkpoint": "הפעולה נכשלה. (xui.checkpoint)",
       "xui.state": "הפעולה נכשלה. (xui.state)",
       "xui.clock": "הפעולה נכשלה. (xui.clock)",
-      "xui.backlog": "נותרו רשומות שלא נקראו"
+      "xui.backlog": "נותרו רשומות שלא נקראו",
+      "xui_journal_source": "יומן הלוח"
     },
     "tr": {
       "nativeName": "Türkçe",
@@ -1809,7 +1818,8 @@
       "xui.checkpoint": "İşlem başarısız oldu. (xui.checkpoint)",
       "xui.state": "İşlem başarısız oldu. (xui.state)",
       "xui.clock": "İşlem başarısız oldu. (xui.clock)",
-      "xui.backlog": "Okunmamış kayıtlar var"
+      "xui.backlog": "Okunmamış kayıtlar var",
+      "xui_journal_source": "Panel günlüğü"
     },
     "fr": {
       "nativeName": "Français",
@@ -1990,7 +2000,8 @@
       "xui.checkpoint": "L’opération a échoué. (xui.checkpoint)",
       "xui.state": "L’opération a échoué. (xui.state)",
       "xui.clock": "L’opération a échoué. (xui.clock)",
-      "xui.backlog": "Des entrées restent à lire"
+      "xui.backlog": "Des entrées restent à lire",
+      "xui_journal_source": "Journal du panneau"
     },
     "de": {
       "nativeName": "Deutsch",
@@ -2171,7 +2182,8 @@
       "xui.checkpoint": "Vorgang fehlgeschlagen. (xui.checkpoint)",
       "xui.state": "Vorgang fehlgeschlagen. (xui.state)",
       "xui.clock": "Vorgang fehlgeschlagen. (xui.clock)",
-      "xui.backlog": "Ungelesene Einträge verbleiben"
+      "xui.backlog": "Ungelesene Einträge verbleiben",
+      "xui_journal_source": "Panel-Journal"
     }
   }
 }

@@ -140,15 +140,29 @@ fn bounded_log_batches_report_backlog_until_all_records_are_read() {
     )
     .unwrap();
     let next = files(&sources, &first.checkpoint, 1700000001).unwrap();
-    assert_eq!(next.records.len(), 256);
+    assert_eq!(next.records.len(), 64);
     assert_eq!(
         next.sources[0].reason_key.as_ref().map(|v| v.as_str()),
         Some("xui.backlog")
     );
-    let last = files(&sources, &next.checkpoint, 1700000002).unwrap();
-    assert_eq!(last.records.len(), 44);
-    assert!(last.sources[0].reason_key.is_none());
-    assert!(!last.sources[0].gap);
+    let mut checkpoint = next.checkpoint;
+    let mut ids: std::collections::BTreeSet<_> = next
+        .records
+        .iter()
+        .map(|r| r.id.as_str().to_owned())
+        .collect();
+    for at in 1700000002..=1700000005 {
+        let batch = files(&sources, &checkpoint, at).unwrap();
+        assert!(batch.records.len() <= 64);
+        ids.extend(batch.records.iter().map(|r| r.id.as_str().to_owned()));
+        if at == 1700000005 {
+            assert_eq!(batch.records.len(), 44);
+            assert!(batch.sources[0].reason_key.is_none());
+            assert!(!batch.sources[0].gap);
+        }
+        checkpoint = batch.checkpoint;
+    }
+    assert_eq!(ids.len(), 300);
 }
 #[test]
 fn writable_source_files_are_rejected_before_reading_records() {
@@ -190,4 +204,52 @@ fn a_symlinked_parent_cannot_redirect_a_log_read() {
         Some("xui.access")
     );
     assert!(batch.checkpoint.files.is_empty());
+}
+
+#[test]
+fn a_busy_first_log_cannot_starve_another_selected_source() {
+    let d = tempfile::tempdir().unwrap();
+    let root = d.path().canonicalize().unwrap();
+    let access = root.join("access.log");
+    let suspicious = root.join("3xipl.log");
+    write_fixture(&access, "").unwrap();
+    write_fixture(&suspicious, "").unwrap();
+    let sources = [
+        LogFile {
+            path: access.clone(),
+            kind: LogKind::Access,
+        },
+        LogFile {
+            path: suspicious.clone(),
+            kind: LogKind::SuspiciousIp,
+        },
+    ];
+    let mut checkpoint = files(&sources, &XuiCheckpoint::default(), 1700000000)
+        .unwrap()
+        .checkpoint;
+    write_fixture(&suspicious, "IP:203.0.113.2\n").unwrap();
+    for at in 1700000001..1700000004 {
+        write!(fs::OpenOptions::new().append(true).open(&access).unwrap(), "{}", "from 198.51.100.9:1234 accepted tcp:example.com:443 [inbound-a >> proxy] email:alice\n".repeat(256)).unwrap();
+        let batch = files(&sources, &checkpoint, at).unwrap();
+        if at == 1700000001 {
+            assert!(
+                batch
+                    .records
+                    .iter()
+                    .any(|r| r.reason_key.as_str() == "xui_suspicious_ip")
+            );
+            assert!(
+                batch
+                    .checkpoint
+                    .files
+                    .iter()
+                    .find(|p| p.slot == 1)
+                    .unwrap()
+                    .offset
+                    > 0
+            );
+        }
+        assert!(batch.records.len() <= 256);
+        checkpoint = batch.checkpoint;
+    }
 }

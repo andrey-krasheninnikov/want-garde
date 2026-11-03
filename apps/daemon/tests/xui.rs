@@ -396,6 +396,17 @@ async fn xui_messages_and_status_follow_every_saved_locale_and_isolate_rtl_value
                 .text
                 .contains(copy["xui_title"].as_str().unwrap())
         );
+        assert!(
+            !status
+                .reply
+                .text
+                .contains(copy["operation_failed"].as_str().unwrap())
+        );
+        assert!(status.reply.text.contains(&format!(
+            "{}: {}",
+            copy["xui_journal_source"].as_str().unwrap(),
+            copy["xui_healthy"].as_str().unwrap()
+        )));
         assert!(status.reply.text.encode_utf16().count() <= 4096);
         assert!(status.reply.text.contains(&long_label));
         assert!(

@@ -474,3 +474,29 @@ async fn an_ssh_file_record_reaches_transport_through_the_durable_queue() {
     assert!(messages[0].contains("alice"));
     assert!(messages[0].contains("Event: ssh:"));
 }
+
+#[tokio::test]
+async fn shared_event_delivery_retains_a_supported_unicode_resource_path() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let path = format!("/srv/{}/{}", "界".repeat(50), "界".repeat(50));
+    let mut config: Config = serde_json::from_value(json!({"server_id":"server-demo","owner_user_id":"123456789","default_locale":"en","bot_token_file":dir.path().join("absent"),"state_dir":dir.path()})).unwrap();
+    config.host_health.disk_paths = vec![path.clone().into()];
+    assert!(config.host_health.valid());
+    let bot = Bot::new(config.clone()).unwrap();
+    let database = Database::open(config).await.unwrap();
+    let mut event: Event =
+        serde_json::from_str(include_str!("../../../fixtures/contracts/event.json")).unwrap();
+    event.evidence = vec![garde_contracts::Evidence {
+        name: Id::new("host_path").unwrap(),
+        value: path.clone(),
+    }];
+    bot.publish_event(&database, event).await.unwrap();
+    let reply = database
+        .call(|s| s.claim(garde_daemon::runtime::now()))
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(reply.reply.text.contains(&path));
+    assert!(reply.reply.text.encode_utf16().count() <= 4096);
+}
