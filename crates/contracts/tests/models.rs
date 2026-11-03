@@ -107,3 +107,23 @@ fn service_listener_and_baseline_contracts_preserve_synthetic_examples() {
     let bad = serde_json::json!({"version":"1","request_id":"request-8","server_id":"server-demo","action":{"type":"ports.baseline.accept"}});
     assert!(garde_contracts::decode_request(&bad.to_string()).is_err());
 }
+
+#[test]
+fn xui_contracts_preserve_examples_and_reject_unversioned_or_executable_requests() {
+    roundtrip::<garde_contracts::XuiHealth>(include_str!(
+        "../../../fixtures/contracts/xui-health.json"
+    ));
+    roundtrip::<garde_contracts::XuiReadRequest>(include_str!(
+        "../../../fixtures/contracts/xui-read-request.json"
+    ));
+    roundtrip::<garde_contracts::XuiReadResponse>(include_str!(
+        "../../../fixtures/contracts/xui-read-response.json"
+    ));
+    for input in [
+        r#"{"type":"snapshot"}"#,
+        r#"{"version":"2","type":"snapshot"}"#,
+        r#"{"version":"1","type":"snapshot","sql":"select password from users"}"#,
+    ] {
+        assert!(serde_json::from_str::<garde_contracts::XuiReadRequest>(input).is_err());
+    }
+}

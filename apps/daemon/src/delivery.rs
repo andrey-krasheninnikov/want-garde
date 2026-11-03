@@ -492,6 +492,23 @@ impl Store {
             now,
         )
     }
+    pub fn xui_health(
+        &self,
+        config: &garde_config::Config,
+        now: i64,
+    ) -> Result<garde_contracts::XuiHealth> {
+        crate::xui::health(config, self.observation_state("xui.state")?.as_deref(), now)
+    }
+    pub fn inspect_xui(
+        config: &garde_config::Config,
+        now: i64,
+    ) -> Result<garde_contracts::XuiHealth> {
+        crate::xui::health(
+            config,
+            Self::inspect_observation(config, "xui.state")?.as_deref(),
+            now,
+        )
+    }
     pub(crate) fn publish_observation(
         &mut self,
         key: &str,
@@ -504,6 +521,7 @@ impl Store {
             "host.state" => crate::host_health::validate_state(state)?,
             "services.state" => crate::services::validate_state(state)?,
             "ports.state" => crate::listeners::validate_state(state)?,
+            "xui.state" => crate::xui::validate_state(state)?,
             _ => return Err("monitor.state"),
         }
         if state.len() > 1048576 {
@@ -525,16 +543,39 @@ impl Store {
             if event.server_id.as_str() != server || payload.len() > 65536 || replies.len() > 32 {
                 return Err("event.invalid");
             }
+            if key == "xui.state" && event.id.as_str().starts_with("xui-log-") {
+                let existing: Option<String> = sql(self
+                    .connection
+                    .query_row(
+                        "SELECT payload FROM events WHERE id=?1",
+                        [event.id.as_str()],
+                        |r| r.get(0),
+                    )
+                    .optional())?;
+                if let Some(existing) = existing {
+                    let saved: Event =
+                        serde_json::from_str(&existing).map_err(|_| "storage.corrupt")?;
+                    let mut replay = event.clone();
+                    replay.observed_at = saved.observed_at;
+                    if serde_json::to_string(&replay).map_err(|_| "event.invalid")? != existing {
+                        return Err("event.conflict");
+                    }
+                    events.push(None);
+                    continue;
+                }
+            }
             count += replies.len();
-            events.push(payload);
+            events.push(Some(payload));
         }
         // 512 endpoints can each contribute four old and new process records.
-        if publications.len() > 1024 || count > 1024 || now < 0 {
+        let limit = if key == "xui.state" { 2048 } else { 1024 };
+        if publications.len() > limit || count > limit || now < 0 {
             return Err("event.invalid");
         }
         self.admit(count as i64, now)?;
         let transaction = sql(self.connection.transaction())?;
         for ((event, replies), payload) in publications.iter().zip(events) {
+            let Some(payload) = payload else { continue };
             sql(transaction.execute(
                 "INSERT INTO events VALUES(?1,?2,?3)",
                 params![event.id.as_str(), payload, now],

@@ -1,0 +1,11 @@
+{
+  "type": "logs",
+  "version": "1",
+  "checkpoint": {
+    "source_id": null,
+    "journal_started": false,
+    "journal_cursor": null,
+    "journal_time": 0,
+    "files": []
+  }
+}

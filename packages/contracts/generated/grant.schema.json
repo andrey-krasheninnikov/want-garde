@@ -34,6 +34,7 @@
         "bans.read",
         "services.read",
         "ports.read",
+        "xui.read",
         "events.read",
         "incidents.read"
       ]

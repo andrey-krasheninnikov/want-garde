@@ -1,0 +1,15 @@
+[Unit]
+Description=Want Garde read-only x-ui socket
+
+[Socket]
+ListenStream=/run/want-garde-xui.sock
+SocketUser=root
+SocketGroup=want-garde
+SocketMode=0660
+Accept=yes
+MaxConnections=4
+Backlog=16
+RemoveOnStop=yes
+
+[Install]
+WantedBy=sockets.target

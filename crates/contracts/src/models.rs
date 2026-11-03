@@ -78,6 +78,8 @@ pub enum Capability {
     ServicesRead,
     #[serde(rename = "ports.read")]
     PortsRead,
+    #[serde(rename = "xui.read")]
+    XuiRead,
     #[serde(rename = "events.read")]
     EventsRead,
     #[serde(rename = "incidents.read")]
@@ -104,6 +106,10 @@ pub struct Grant {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, TS)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum OperationResult {
+    XuiStatus {
+        server_id: Id,
+        health: Box<crate::XuiHealth>,
+    },
     ServicesStatus {
         server_id: Id,
         health: Box<crate::ServicesHealth>,

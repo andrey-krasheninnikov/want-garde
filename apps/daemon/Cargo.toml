@@ -29,4 +29,5 @@ workspace = true
 
 
 [dev-dependencies]
+garde-xui = { path = "../../crates/xui" }
 tempfile = "3"

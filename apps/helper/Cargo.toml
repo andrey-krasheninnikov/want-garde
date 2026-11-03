@@ -11,6 +11,7 @@ name = "want-garde-helper"
 path = "src/main.rs"
 
 [dependencies]
+garde-xui = { path = "../../crates/xui" }
 garde-entrypoint = { path = "../../crates/entrypoint" }
 garde-contracts.workspace = true
 serde.workspace = true

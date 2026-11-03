@@ -30,6 +30,10 @@ pub fn contract_artifacts() -> Result<BTreeMap<&'static str, String>, serde_json
     schema!("baseline-preview.schema.json", BaselinePreview);
     schema!("listener-read-response.schema.json", ListenerReadResponse);
 
+    schema!("xui-health.schema.json", XuiHealth);
+    schema!("xui-read-request.schema.json", XuiReadRequest);
+    schema!("xui-read-response.schema.json", XuiReadResponse);
+
     let mut types = format!(
         "export const PRODUCT_VERSION = {:?} as const;\nexport const CONTRACT_VERSION = \"1\" as const;\n",
         PRODUCT_VERSION
@@ -89,6 +93,19 @@ pub fn contract_artifacts() -> Result<BTreeMap<&'static str, String>, serde_json
         PortsHealth,
         BaselinePreview,
         ListenerReadResponse,
+        XuiPanelRow,
+        XuiClient,
+        XuiSnapshot,
+        XuiFilePosition,
+        XuiCheckpoint,
+        XuiSourceHealth,
+        XuiLogRecord,
+        XuiLogBatch,
+        XuiReadRequest,
+        XuiReadResponse,
+        XuiConnectionState,
+        XuiClientStatus,
+        XuiHealth,
         OperationResult,
         JobState,
         Job,

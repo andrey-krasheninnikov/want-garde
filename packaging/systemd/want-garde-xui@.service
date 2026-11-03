@@ -1,0 +1,36 @@
+[Unit]
+Description=Want Garde read-only x-ui connection
+CollectMode=inactive-or-failed
+
+[Service]
+ExecStart=/usr/local/lib/want-garde/current/want-garde-helper --serve-xui-read --daemon-uid-file /etc/want-garde-helper/daemon-uid --xui-policy /etc/want-garde-helper/xui.json
+User=root
+Group=root
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal
+RuntimeMaxSec=6
+TimeoutStopSec=1
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+PrivateNetwork=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectKernelLogs=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryMax=64M
+TasksMax=16
+LimitNOFILE=64
+SystemCallFilter=~ptrace process_vm_readv process_vm_writev pidfd_getfd
+InaccessiblePaths=-/etc/want-garde -/var/lib/want-garde -/var/backups/want-garde -/etc/shadow -/etc/gshadow -/root -/run/dbus -/run/systemd/private -/run/fail2ban -/run/docker.sock

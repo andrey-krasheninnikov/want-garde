@@ -106,3 +106,7 @@ _Avoid_: Event / Событие, когда речь об отправке со�
 
 Сохранённый набор ожидаемых listening endpoints одной установки, с которым сравниваются наблюдения. / A saved set of expected listening endpoints for one installation, used to compare observations.
 _Avoid_: Последний снимок / Latest snapshot.
+
+**Panel snapshot / Снимок панели**
+
+Нормализованное наблюдение конфигурации x-ui/3x-ui и метаданных клиентов с fingerprints конфигурационных значений и явной доступностью данных. / A normalized observation of x-ui/3x-ui configuration and client metadata, with configuration fingerprints and explicit data availability.

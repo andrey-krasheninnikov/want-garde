@@ -34,7 +34,7 @@ async fn run() -> ExitCode {
     }
     if args == ["--help"] {
         println!(
-            "{}: want-garde-daemon [--lang LOCALE] [--check-config | --delivery-status | --ssh-status | --firewall-status | --host-status | --services-status | --ports-status | --ports-baseline-preview | --ports-baseline-accept HASH] --config PATH",
+            "{}: want-garde-daemon [--lang LOCALE] [--check-config | --delivery-status | --ssh-status | --firewall-status | --host-status | --services-status | --ports-status | --xui-status | --ports-baseline-preview | --ports-baseline-accept HASH] --config PATH",
             message(locale, "usage")
         );
         return ExitCode::SUCCESS;
@@ -44,6 +44,7 @@ async fn run() -> ExitCode {
             if [
                 "--services-status",
                 "--ports-status",
+                "--xui-status",
                 "--ports-baseline-preview",
             ]
             .contains(&flag.as_str())
@@ -238,6 +239,11 @@ async fn monitoring_command(flag: &str, hash: Option<&str>, path: &Path) -> Exit
         let config = Config::load(path)?;
         let now = garde_daemon::runtime::now();
         match flag {
+            "--xui-status" => {
+                let h = garde_daemon::delivery::Store::inspect_xui(&config, now)?;
+                let normal = garde_daemon::xui::healthy(&h);
+                Ok((serde_json::to_value(h).map_err(|_| "xui.state")?, normal))
+            }
             "--services-status" => {
                 let h = garde_daemon::delivery::Store::inspect_services(&config, now)?;
                 let normal = garde_daemon::services::healthy(&h);

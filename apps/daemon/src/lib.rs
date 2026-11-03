@@ -165,13 +165,19 @@ impl Bot {
         if id < offset {
             return Ok(offset);
         }
-        let reply = if let Some((command @ ("/services" | "/ports"), args)) =
+        let reply = if let Some((command @ ("/services" | "/ports" | "/xui"), args)) =
             self.command(update, username)
         {
             let text = match crate::observation::page(&args) {
                 Err(_) => message(&self.locale, "monitor_usage").into(),
                 Ok(page) => {
-                    if command == "/services" {
+                    if command == "/xui" {
+                        let config = self.config.clone();
+                        let health = database
+                            .call(move |s| s.xui_health(&config, runtime::now()))
+                            .await?;
+                        crate::xui::render(&health, page, &self.locale)
+                    } else if command == "/services" {
                         let config = self.config.clone();
                         let health = database
                             .call(move |s| s.services_health(&config, runtime::now()))
@@ -288,19 +294,25 @@ impl Bot {
                         message(&self.locale, evidence.name.as_str())
                     }
                 ),
-                isolate(if evidence.name.as_str() == "host_metric" {
-                    message(
-                        &self.locale,
-                        match evidence.value.as_str() {
-                            "disk" => "host_disk",
-                            "inode" => "host_inode",
-                            "reboot" => "host_reboot",
-                            value => value,
-                        },
-                    )
-                } else {
-                    &evidence.value
-                })
+                isolate_evidence(
+                    if evidence.name.as_str() == "xui_reason"
+                        && message(&self.locale, &evidence.value) != "message.unavailable"
+                    {
+                        message(&self.locale, &evidence.value)
+                    } else if evidence.name.as_str() == "host_metric" {
+                        message(
+                            &self.locale,
+                            match evidence.value.as_str() {
+                                "disk" => "host_disk",
+                                "inode" => "host_inode",
+                                "reboot" => "host_reboot",
+                                value => value,
+                            },
+                        )
+                    } else {
+                        &evidence.value
+                    }
+                )
             ));
         }
         let replies = vec![Reply {
@@ -411,14 +423,24 @@ fn render_delivery(health: &garde_contracts::DeliveryHealth, locale: &str) -> St
     lines.join("\n")
 }
 
+fn presentation_chars(value: &str) -> impl Iterator<Item = char> + '_ {
+    value.chars().filter(|c| {
+        !c.is_control() && !matches!(*c,'\u{202a}'..='\u{202e}'|'\u{2066}'..='\u{2069}')
+    })
+}
 fn isolate(value: &str) -> String {
-    let text: String = value
-        .chars()
-        .filter(|c| {
-            !c.is_control() && !matches!(*c, '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
-        })
-        .take(128)
-        .collect();
+    let text: String = presentation_chars(value).take(128).collect();
+    format!("\u{2068}{text}\u{2069}")
+}
+fn isolate_evidence(value: &str) -> String {
+    // Eight byte-bounded values must fit Telegram's UTF-16 message limit.
+    let mut text = String::new();
+    for c in presentation_chars(value) {
+        if text.len() + c.len_utf8() > 255 {
+            break;
+        }
+        text.push(c);
+    }
     format!("\u{2068}{text}\u{2069}")
 }
 
@@ -571,3 +593,5 @@ pub fn run_process(work: impl Future<Output = std::process::ExitCode>) -> std::p
     runtime.shutdown_timeout(std::time::Duration::from_secs(1));
     result
 }
+
+pub mod xui;

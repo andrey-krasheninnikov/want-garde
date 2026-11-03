@@ -1,0 +1,443 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "XuiReadResponse",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "reason_key": {
+          "$ref": "#/$defs/Id"
+        },
+        "type": {
+          "type": "string",
+          "const": "unavailable"
+        },
+        "version": {
+          "$ref": "#/$defs/WireVersion"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "version",
+        "reason_key"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "snapshot": {
+          "$ref": "#/$defs/XuiSnapshot"
+        },
+        "type": {
+          "type": "string",
+          "const": "snapshot"
+        },
+        "version": {
+          "$ref": "#/$defs/WireVersion"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "version",
+        "snapshot"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "batch": {
+          "$ref": "#/$defs/XuiLogBatch"
+        },
+        "type": {
+          "type": "string",
+          "const": "logs"
+        },
+        "version": {
+          "$ref": "#/$defs/WireVersion"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "version",
+        "batch"
+      ]
+    }
+  ],
+  "$defs": {
+    "Evidence": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/Id"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "value"
+      ]
+    },
+    "Id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "Measurement": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "available"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/XuiPanelRow"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "reason_key": {
+              "$ref": "#/$defs/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "unavailable"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "reason_key"
+          ]
+        }
+      ]
+    },
+    "Measurement2": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "available"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/XuiClient"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "reason_key": {
+              "$ref": "#/$defs/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "unavailable"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "reason_key"
+          ]
+        }
+      ]
+    },
+    "WireVersion": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    },
+    "XuiCheckpoint": {
+      "type": "object",
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/XuiFilePosition"
+          }
+        },
+        "journal_cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "journal_started": {
+          "type": "boolean"
+        },
+        "journal_time": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "source_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "journal_started",
+        "journal_time",
+        "files"
+      ]
+    },
+    "XuiClient": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "inbound_id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "key": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "last_online": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "traffic_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "label",
+        "inbound_id",
+        "enabled",
+        "traffic_bytes"
+      ]
+    },
+    "XuiFilePosition": {
+      "type": "object",
+      "properties": {
+        "anchor": {
+          "type": "string"
+        },
+        "device": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "discard": {
+          "type": "boolean"
+        },
+        "generation": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "inode": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "offset": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "slot": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "slot",
+        "device",
+        "inode",
+        "generation",
+        "offset",
+        "anchor",
+        "discard"
+      ]
+    },
+    "XuiLogBatch": {
+      "type": "object",
+      "properties": {
+        "checkpoint": {
+          "$ref": "#/$defs/XuiCheckpoint"
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/XuiLogRecord"
+          }
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/XuiSourceHealth"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "checkpoint",
+        "sources",
+        "records"
+      ]
+    },
+    "XuiLogRecord": {
+      "type": "object",
+      "properties": {
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          }
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "reason_key": {
+          "$ref": "#/$defs/Id"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "observed_at",
+        "reason_key",
+        "evidence"
+      ]
+    },
+    "XuiPanelRow": {
+      "type": "object",
+      "properties": {
+        "fields": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "fields"
+      ]
+    },
+    "XuiSnapshot": {
+      "type": "object",
+      "properties": {
+        "clients": {
+          "$ref": "#/$defs/Measurement2"
+        },
+        "connectivity_available": {
+          "type": "boolean"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "panel": {
+          "$ref": "#/$defs/Measurement"
+        },
+        "schema": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_id": {
+          "type": "string"
+        },
+        "version": {
+          "$ref": "#/$defs/WireVersion"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "version",
+        "observed_at",
+        "panel",
+        "clients",
+        "connectivity_available"
+      ]
+    },
+    "XuiSourceHealth": {
+      "type": "object",
+      "properties": {
+        "gap": {
+          "type": "boolean"
+        },
+        "reason_key": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/Id"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "gap"
+      ]
+    }
+  }
+}

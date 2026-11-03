@@ -1,0 +1,50 @@
+{
+  "version": "1",
+  "server_id": "server-demo",
+  "enabled": true,
+  "checked_at": "2023-11-14T22:13:20Z",
+  "logs_checked_at": "2023-11-14T22:13:20Z",
+  "stale": false,
+  "schema": "xui.normalized",
+  "sources": [
+    {
+      "source": "xui.database",
+      "reason_key": null,
+      "gap": false
+    },
+    {
+      "source": "xui.panel",
+      "reason_key": null,
+      "gap": false
+    },
+    {
+      "source": "xui.clients",
+      "reason_key": null,
+      "gap": false
+    },
+    {
+      "source": "xui.connectivity",
+      "reason_key": null,
+      "gap": false
+    },
+    {
+      "source": "xui.journal",
+      "reason_key": null,
+      "gap": false
+    }
+  ],
+  "gaps": 0,
+  "clients": [
+    {
+      "client": {
+        "key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "label": "alice",
+        "inbound_id": 7,
+        "enabled": true,
+        "last_online": 1700000000,
+        "traffic_bytes": 30
+      },
+      "state": "online"
+    }
+  ]
+}

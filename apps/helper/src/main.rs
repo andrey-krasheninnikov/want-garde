@@ -5,7 +5,20 @@ fn main() -> ExitCode {
         && (serve == "--serve-read" || serve == "--serve-listeners-read")
         && flag == "--daemon-uid-file"
     {
-        return match run(Path::new(path), serve == "--serve-listeners-read") {
+        return match run(Path::new(path), serve == "--serve-listeners-read", None) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(code) => {
+                eprintln!("{code}");
+                ExitCode::from(2)
+            }
+        };
+    }
+    if let [serve, flag, path, policy_flag, policy] = args.as_slice()
+        && serve == "--serve-xui-read"
+        && flag == "--daemon-uid-file"
+        && policy_flag == "--xui-policy"
+    {
+        return match run(Path::new(path), false, Some(Path::new(policy))) {
             Ok(()) => ExitCode::SUCCESS,
             Err(code) => {
                 eprintln!("{code}");
@@ -25,12 +38,13 @@ fn main() -> ExitCode {
             "{}: want-garde-helper [--lang LOCALE] --help | --version\nwant-garde-helper [--serve-read | --serve-listeners-read] --daemon-uid-file PATH",
             garde_entrypoint::message(locale, "usage")
         );
+        println!("want-garde-helper --serve-xui-read --daemon-uid-file PATH --xui-policy PATH");
         println!("{}", garde_entrypoint::message(locale, "helper_read_only"));
         return ExitCode::SUCCESS;
     }
     garde_entrypoint::run("want-garde-helper")
 }
-fn run(path: &Path, listeners: bool) -> Result<(), &'static str> {
+fn run(path: &Path, listeners: bool, xui_policy: Option<&Path>) -> Result<(), &'static str> {
     if rustix::process::geteuid().as_raw() != 0 {
         return Err("helper.peer");
     }
@@ -43,6 +57,10 @@ fn run(path: &Path, listeners: bool) -> Result<(), &'static str> {
         .and_then(|s| s.trim().parse::<u32>().ok())
         .filter(|n| *n > 0)
         .ok_or("helper.policy")?;
+    let xui_source = xui_policy
+        .map(garde_helper::xui::Policy::load)
+        .transpose()?
+        .map(garde_helper::xui::SystemXui);
     let fd = std::io::stdin()
         .as_fd()
         .try_clone_to_owned()
@@ -55,7 +73,9 @@ fn run(path: &Path, listeners: bool) -> Result<(), &'static str> {
         .map_err(|_| "helper.runtime")?
         .block_on(async {
             let stream = tokio::net::UnixStream::from_std(socket).map_err(|_| "helper.socket")?;
-            if listeners {
+            if let Some(source) = xui_source {
+                garde_helper::xui::serve_connection(stream, uid, &source).await
+            } else if listeners {
                 garde_helper::listeners::serve_connection(
                     stream,
                     uid,

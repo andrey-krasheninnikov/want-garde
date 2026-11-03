@@ -1,0 +1,35 @@
+{
+  "type": "snapshot",
+  "version": "1",
+  "snapshot": {
+    "source_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "version": "1",
+    "observed_at": "2023-11-14T22:13:20Z",
+    "schema": "xui.normalized",
+    "panel": {
+      "type": "available",
+      "value": [
+        {
+          "key": "users:1",
+          "fields": {
+            "password": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          }
+        }
+      ]
+    },
+    "clients": {
+      "type": "available",
+      "value": [
+        {
+          "key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "label": "alice",
+          "inbound_id": 7,
+          "enabled": true,
+          "last_online": 1700000000,
+          "traffic_bytes": 30
+        }
+      ]
+    },
+    "connectivity_available": true
+  }
+}

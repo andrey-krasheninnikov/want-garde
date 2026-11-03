@@ -1,5 +1,6 @@
 mod host;
 mod monitoring;
+mod xui;
 use garde_contracts::Id;
 pub use host::HostHealthConfig;
 pub use monitoring::{PortsConfig, ServicesConfig, valid_unit};
@@ -11,6 +12,7 @@ use std::{
     path::{Path, PathBuf},
     sync::atomic::{AtomicU64, Ordering},
 };
+pub use xui::XuiConfig;
 
 pub type Result<T> = std::result::Result<T, &'static str>;
 
@@ -34,6 +36,8 @@ pub struct Config {
     pub services: ServicesConfig,
     #[serde(default)]
     pub ports: PortsConfig,
+    #[serde(default)]
+    pub xui: XuiConfig,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -114,7 +118,8 @@ impl Config {
         let value: Self =
             serde_json::from_slice(&read_private(path, 65536)?).map_err(|_| "config.invalid")?;
         let valid_source = |source: &SshConfig| !matches!(source, SshConfig::File { path } if !path.is_absolute() || path.components().any(|p| matches!(p, std::path::Component::ParentDir)) || path.as_os_str().len() > 4096);
-        if !value.ports.valid()
+        if !value.xui.valid()
+            || !value.ports.valid()
             || !value.services.valid()
             || !value.host_health.valid()
             || !valid_source(&value.ssh)

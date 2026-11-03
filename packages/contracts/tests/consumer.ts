@@ -164,3 +164,47 @@ const remoteAccept: Action = { type: "ports.baseline.accept" };
 // @ts-expect-error No executable may be supplied to a read request.
 const rootRead: Action = { type: "ports.status", executable: "/bin/sh" };
 void [serviceResult, portsResult, listener, remoteAccept, rootRead];
+
+const xuiRequest: import("../generated/index").XuiReadRequest = {
+  type: "logs",
+  version: "1",
+  checkpoint: {
+    source_id: null,
+    journal_started: false,
+    journal_cursor: null,
+    journal_time: 0,
+    files: [],
+  },
+};
+const xuiHealth: import("../generated/index").XuiHealth = {
+  version: "1",
+  server_id: "server-demo",
+  enabled: true,
+  checked_at: "2023-11-14T22:13:20Z",
+  logs_checked_at: "2023-11-14T22:13:20Z",
+  stale: false,
+  schema: "xui.normalized",
+  sources: [],
+  gaps: 0,
+  clients: [
+    {
+      client: {
+        key: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        label: "alice",
+        inbound_id: 7,
+        enabled: true,
+        last_online: 1700000000,
+        traffic_bytes: 30,
+      },
+      state: "online",
+    },
+  ],
+};
+const xuiAction: Action = { type: "xui.status" };
+const invalidXui: import("../generated/index").XuiReadRequest = {
+  type: "snapshot",
+  version: "1",
+  // @ts-expect-error Read requests cannot carry SQL.
+  sql: "select password from users",
+};
+void [xuiRequest, xuiHealth, xuiAction, invalidXui];

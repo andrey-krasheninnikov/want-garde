@@ -85,3 +85,7 @@ HostSnapshot добавляет `cpu_count`, `load_per_core`, `disks` и `reboot
 `services.status` and `ports.status` add typed read actions/results and corresponding read capabilities. `ServicesHealth`, `PortsHealth`, `BaselinePreview` and the separate `ListenerReadResponse` are exported with their schemas and TypeScript. Baseline acceptance is a local daemon command, not a remote action. Existing components must use the same unreleased product revision; wire version remains 1.
 
 `services.status` и `ports.status` добавляют типизированные read actions/results и соответствующие read capabilities. `ServicesHealth`, `PortsHealth`, `BaselinePreview` и отдельный `ListenerReadResponse` экспортируются вместе со schemas и TypeScript. Принятие baseline является локальной командой daemon, не удалённым action. Компоненты используют одну unreleased-ревизию продукта; wire version остаётся 1.
+
+## x-ui observation / Наблюдение x-ui
+
+`xui.status` и `xui.read` описывают просмотр сохранённого состояния; разрешений на изменение панели нет. `XuiHealth` отделяет здоровье источников от состояния соединений. Закрытый `XuiReadRequest` допускает только snapshot либо logs с checkpoint; `XuiReadResponse` содержит нормализованные данные без сырых журналов и секретов. / `xui.status` and `xui.read` describe saved-state inspection without panel mutations. `XuiHealth` separates source health from connectivity. The closed `XuiReadRequest` accepts only snapshot or checkpointed logs; `XuiReadResponse` contains normalized data without raw logs or secrets.
