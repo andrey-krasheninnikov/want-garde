@@ -30,4 +30,4 @@ RestrictAddressFamilies=AF_UNIX AF_NETLINK
 RestrictNamespaces=true
 LockPersonality=true
 SystemCallFilter=~ptrace process_vm_readv process_vm_writev pidfd_getfd
-InaccessiblePaths=-/etc/want-garde -/var/lib/want-garde -/var/backups/want-garde -/etc/shadow -/etc/gshadow -/root -/run/dbus -/run/systemd -/run/fail2ban
+InaccessiblePaths=-/etc/want-garde -/var/lib/want-garde -/var/backups/want-garde -/etc/shadow -/etc/gshadow -/root -/run/dbus -/run/systemd/private -/run/fail2ban
