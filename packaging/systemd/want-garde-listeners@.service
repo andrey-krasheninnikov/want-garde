@@ -1,0 +1,33 @@
+[Unit]
+Description=Want Garde read-only listener connection
+CollectMode=inactive-or-failed
+
+[Service]
+ExecStart=/usr/local/lib/want-garde/current/want-garde-helper --serve-listeners-read --daemon-uid-file /etc/want-garde-helper/daemon-uid
+User=root
+Group=root
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal
+RuntimeMaxSec=6
+TimeoutStopSec=1
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+PrivateNetwork=false
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectKernelLogs=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+RestrictNamespaces=true
+LockPersonality=true
+SystemCallFilter=~ptrace process_vm_readv process_vm_writev pidfd_getfd
+InaccessiblePaths=-/etc/want-garde -/var/lib/want-garde -/var/backups/want-garde -/etc/shadow -/etc/gshadow -/root -/run/dbus -/run/systemd/private -/run/fail2ban

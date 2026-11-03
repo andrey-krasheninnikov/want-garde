@@ -10,7 +10,10 @@ pub mod firewall;
 pub mod host;
 pub mod host_health;
 pub mod ingest;
+pub mod listeners;
+mod observation;
 pub mod runtime;
+pub mod services;
 pub mod ssh;
 pub mod telegram;
 
@@ -162,7 +165,32 @@ impl Bot {
         if id < offset {
             return Ok(offset);
         }
-        let reply = if self
+        let reply = if let Some((command @ ("/services" | "/ports"), args)) =
+            self.command(update, username)
+        {
+            let text = match crate::observation::page(&args) {
+                Err(_) => message(&self.locale, "monitor_usage").into(),
+                Ok(page) => {
+                    if command == "/services" {
+                        let config = self.config.clone();
+                        let health = database
+                            .call(move |s| s.services_health(&config, runtime::now()))
+                            .await?;
+                        crate::services::render(&health, page, &self.locale)
+                    } else {
+                        let config = self.config.clone();
+                        let health = database
+                            .call(move |s| s.ports_health(&config, runtime::now()))
+                            .await?;
+                        crate::listeners::render(&health, page, &self.locale)
+                    }
+                }
+            };
+            Some(Reply {
+                chat_id: self.config.owner()?.into(),
+                text,
+            })
+        } else if self
             .command(update, username)
             .is_some_and(|(command, args)| command == "/delivery" && args.is_empty())
         {

@@ -2,10 +2,10 @@ use std::{os::fd::AsFd, path::Path, process::ExitCode};
 fn main() -> ExitCode {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     if let [serve, flag, path] = args.as_slice()
-        && serve == "--serve-read"
+        && (serve == "--serve-read" || serve == "--serve-listeners-read")
         && flag == "--daemon-uid-file"
     {
-        return match run(Path::new(path)) {
+        return match run(Path::new(path), serve == "--serve-listeners-read") {
             Ok(()) => ExitCode::SUCCESS,
             Err(code) => {
                 eprintln!("{code}");
@@ -22,7 +22,7 @@ fn main() -> ExitCode {
             "en"
         };
         println!(
-            "{}: want-garde-helper [--lang LOCALE] --help | --version\nwant-garde-helper --serve-read --daemon-uid-file PATH",
+            "{}: want-garde-helper [--lang LOCALE] --help | --version\nwant-garde-helper [--serve-read | --serve-listeners-read] --daemon-uid-file PATH",
             garde_entrypoint::message(locale, "usage")
         );
         println!("{}", garde_entrypoint::message(locale, "helper_read_only"));
@@ -30,7 +30,7 @@ fn main() -> ExitCode {
     }
     garde_entrypoint::run("want-garde-helper")
 }
-fn run(path: &Path) -> Result<(), &'static str> {
+fn run(path: &Path, listeners: bool) -> Result<(), &'static str> {
     if rustix::process::geteuid().as_raw() != 0 {
         return Err("helper.peer");
     }
@@ -55,6 +55,15 @@ fn run(path: &Path) -> Result<(), &'static str> {
         .map_err(|_| "helper.runtime")?
         .block_on(async {
             let stream = tokio::net::UnixStream::from_std(socket).map_err(|_| "helper.socket")?;
-            garde_helper::serve_connection(stream, uid, &garde_helper::Fail2ban).await
+            if listeners {
+                garde_helper::listeners::serve_connection(
+                    stream,
+                    uid,
+                    &garde_helper::listeners::SystemListeners,
+                )
+                .await
+            } else {
+                garde_helper::serve_connection(stream, uid, &garde_helper::Fail2ban).await
+            }
         })
 }

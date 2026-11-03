@@ -34,10 +34,27 @@ async fn run() -> ExitCode {
     }
     if args == ["--help"] {
         println!(
-            "{}: want-garde-daemon [--lang LOCALE] [--check-config | --delivery-status | --ssh-status | --firewall-status | --host-status] --config PATH",
+            "{}: want-garde-daemon [--lang LOCALE] [--check-config | --delivery-status | --ssh-status | --firewall-status | --host-status | --services-status | --ports-status | --ports-baseline-preview | --ports-baseline-accept HASH] --config PATH",
             message(locale, "usage")
         );
         return ExitCode::SUCCESS;
+    }
+    match args {
+        [flag, config, path]
+            if [
+                "--services-status",
+                "--ports-status",
+                "--ports-baseline-preview",
+            ]
+            .contains(&flag.as_str())
+                && config == "--config" =>
+        {
+            return monitoring_command(flag, None, Path::new(path)).await;
+        }
+        [flag, hash, config, path] if flag == "--ports-baseline-accept" && config == "--config" => {
+            return monitoring_command(flag, Some(hash), Path::new(path)).await;
+        }
+        _ => {}
     }
     let host_diagnostic = args.first().is_some_and(|s| s == "--host-status");
     let (check, diagnostic, ssh_diagnostic, firewall_diagnostic, path) = match args {
@@ -214,4 +231,81 @@ fn diagnostic_error(code: &str) -> ExitCode {
         serde_json::json!({"version":"1","error":{"code":"unavailable","message_key":code}})
     );
     ExitCode::from(2)
+}
+
+async fn monitoring_command(flag: &str, hash: Option<&str>, path: &Path) -> ExitCode {
+    let result: Result<(serde_json::Value, bool), &'static str> = async {
+        let config = Config::load(path)?;
+        let now = garde_daemon::runtime::now();
+        match flag {
+            "--services-status" => {
+                let h = garde_daemon::delivery::Store::inspect_services(&config, now)?;
+                let normal = garde_daemon::services::healthy(&h);
+                Ok((
+                    serde_json::to_value(h).map_err(|_| "services.state")?,
+                    normal,
+                ))
+            }
+            "--ports-status" => {
+                let h = garde_daemon::delivery::Store::inspect_ports(&config, now)?;
+                let normal = garde_daemon::listeners::healthy(&h);
+                Ok((serde_json::to_value(h).map_err(|_| "ports.state")?, normal))
+            }
+            "--ports-baseline-preview" => {
+                let saved =
+                    garde_daemon::delivery::Store::inspect_observation(&config, "ports.state")?;
+                let raw = garde_daemon::listeners::LinuxSource::default().read().await;
+                let preview = garde_daemon::listeners::baseline_preview(
+                    &config,
+                    saved.as_deref(),
+                    raw,
+                    garde_daemon::runtime::now(),
+                )?;
+                Ok((
+                    serde_json::to_value(preview).map_err(|_| "ports.state")?,
+                    true,
+                ))
+            }
+            "--ports-baseline-accept" => {
+                let hash = hash
+                    .filter(|h| {
+                        h.len() == 64
+                            && h.bytes()
+                                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+                    })
+                    .ok_or("request.invalid")?;
+                if !cfg!(target_os = "linux") || rustix::process::geteuid().is_root() {
+                    return Err("service.identity");
+                }
+                garde_daemon::delivery::Store::inspect_observation(&config, "ports.state")?;
+                let database = garde_daemon::runtime::Database::open(config.clone()).await?;
+                let raw = garde_daemon::listeners::LinuxSource::default().read().await;
+                let mut monitor =
+                    garde_daemon::listeners::Monitor::new(config.clone(), database.clone());
+                monitor
+                    .accept(raw, hash, garde_daemon::runtime::now())
+                    .await?;
+                let health = database
+                    .call(move |s| s.ports_health(&config, garde_daemon::runtime::now()))
+                    .await?;
+                Ok((
+                    serde_json::to_value(health).map_err(|_| "ports.state")?,
+                    true,
+                ))
+            }
+            _ => Err("request.invalid"),
+        }
+    }
+    .await;
+    match result {
+        Ok((json, normal)) => {
+            println!("{json}");
+            if normal {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(1)
+            }
+        }
+        Err(code) => diagnostic_error(code),
+    }
 }

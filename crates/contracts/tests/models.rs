@@ -85,3 +85,25 @@ fn firewall_observations_and_live_bans_preserve_wire_examples() {
         "../../../fixtures/contracts/helper-response.json"
     ));
 }
+
+#[test]
+fn service_listener_and_baseline_contracts_preserve_synthetic_examples() {
+    roundtrip::<garde_contracts::ServicesHealth>(include_str!(
+        "../../../fixtures/contracts/services-health.json"
+    ));
+    roundtrip::<garde_contracts::PortsHealth>(include_str!(
+        "../../../fixtures/contracts/ports-health.json"
+    ));
+    roundtrip::<garde_contracts::BaselinePreview>(include_str!(
+        "../../../fixtures/contracts/baseline-preview.json"
+    ));
+    roundtrip::<garde_contracts::ListenerReadResponse>(include_str!(
+        "../../../fixtures/contracts/listener-read-response.json"
+    ));
+    for action in ["services.status", "ports.status"] {
+        let input = serde_json::json!({"version":"1","request_id":"request-8","server_id":"server-demo","action":{"type":action}});
+        assert!(garde_contracts::decode_request(&input.to_string()).is_ok());
+    }
+    let bad = serde_json::json!({"version":"1","request_id":"request-8","server_id":"server-demo","action":{"type":"ports.baseline.accept"}});
+    assert!(garde_contracts::decode_request(&bad.to_string()).is_err());
+}

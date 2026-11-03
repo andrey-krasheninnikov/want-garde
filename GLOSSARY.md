@@ -101,3 +101,8 @@ _Avoid_: Event / Событие, когда речь об отправке со�
 **Resource threshold / Порог ресурса**
 
 Проверяемая граница показателя хоста с сохраняемым состоянием warning/critical и отдельным восстановлением. / A host measurement limit with durable warning/critical state and separate recovery.
+
+**Listener baseline / Baseline listeners**
+
+Сохранённый набор ожидаемых listening endpoints одной установки, с которым сравниваются наблюдения. / A saved set of expected listening endpoints for one installation, used to compare observations.
+_Avoid_: Последний снимок / Latest snapshot.

@@ -248,6 +248,8 @@ pub async fn serve(config: Config) -> Result<()> {
         config.host_health.disk_paths.clone(),
     );
     let mut host = crate::host_health::Monitor::new(config.clone(), database.clone());
+    let mut services = crate::services::Monitor::new(config.clone(), database.clone());
+    let mut ports = crate::listeners::Monitor::new(config.clone(), database.clone());
     let mut collector = crate::ssh::Collector::new(config.clone(), database.clone());
     let mut fail2ban = crate::ingest::Collector::for_source(
         crate::ingest::Kind::Fail2ban,
@@ -261,6 +263,8 @@ pub async fn serve(config: Config) -> Result<()> {
     );
     tokio::try_join!(
         host.run(&source),
+        services.run(),
+        ports.run(),
         collector.run(),
         fail2ban.run(),
         firewall.run(),

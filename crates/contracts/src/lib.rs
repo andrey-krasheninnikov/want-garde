@@ -1,5 +1,9 @@
+mod listeners;
+pub use listeners::*;
+mod services;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+pub use services::*;
 use ts_rs::TS;
 
 pub const PRODUCT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -48,6 +52,10 @@ pub enum Action {
     ServerStatus {},
     #[serde(rename = "fail2ban.status")]
     Fail2banStatus {},
+    #[serde(rename = "services.status")]
+    ServicesStatus {},
+    #[serde(rename = "ports.status")]
+    PortsStatus {},
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]

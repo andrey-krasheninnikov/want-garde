@@ -1,0 +1,28 @@
+{
+  "version": "1",
+  "server_id": "server-demo",
+  "checked_at": "2026-11-03T00:00:00Z",
+  "enabled": true,
+  "stale": false,
+  "services": [
+    {
+      "unit": "example.service",
+      "state": {
+        "type": "available",
+        "value": {
+          "load_state": "loaded",
+          "active_state": "inactive",
+          "sub_state": "dead"
+        }
+      }
+    },
+    {
+      "unit": "absent.service",
+      "state": {
+        "type": "unavailable",
+        "reason_key": "services.unit_missing"
+      }
+    }
+  ],
+  "down": ["example.service"]
+}

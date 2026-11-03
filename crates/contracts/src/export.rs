@@ -25,6 +25,11 @@ pub fn contract_artifacts() -> Result<BTreeMap<&'static str, String>, serde_json
     schema!("bans-snapshot.schema.json", BansSnapshot);
     schema!("helper-response.schema.json", HelperResponse);
 
+    schema!("services-health.schema.json", ServicesHealth);
+    schema!("ports-health.schema.json", PortsHealth);
+    schema!("baseline-preview.schema.json", BaselinePreview);
+    schema!("listener-read-response.schema.json", ListenerReadResponse);
+
     let mut types = format!(
         "export const PRODUCT_VERSION = {:?} as const;\nexport const CONTRACT_VERSION = \"1\" as const;\n",
         PRODUCT_VERSION
@@ -70,6 +75,20 @@ pub fn contract_artifacts() -> Result<BTreeMap<&'static str, String>, serde_json
         JailBans,
         BansSnapshot,
         HelperResponse,
+        ServiceStatus,
+        ServiceObservation,
+        ServicesHealth,
+        AddressFamily,
+        ListenerProtocol,
+        Endpoint,
+        ListenerProcess,
+        Listener,
+        SuspiciousListener,
+        PortsSnapshot,
+        PortBaseline,
+        PortsHealth,
+        BaselinePreview,
+        ListenerReadResponse,
         OperationResult,
         JobState,
         Job,

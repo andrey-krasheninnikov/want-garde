@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PortsHealth",
+  "type": "object",
+  "properties": {
+    "added": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Endpoint"
+      }
+    },
+    "baseline": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PortBaseline"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "problems": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Id"
+      }
+    },
+    "removed": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Endpoint"
+      }
+    },
+    "server_id": {
+      "$ref": "#/$defs/Id"
+    },
+    "snapshot": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PortsSnapshot"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "stale": {
+      "type": "boolean"
+    },
+    "suspicious": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SuspiciousListener"
+      }
+    },
+    "version": {
+      "$ref": "#/$defs/WireVersion"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "server_id",
+    "enabled",
+    "stale",
+    "added",
+    "removed",
+    "suspicious",
+    "problems"
+  ],
+  "$defs": {
+    "AddressFamily": {
+      "type": "string",
+      "enum": [
+        "ipv4",
+        "ipv6"
+      ]
+    },
+    "Endpoint": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "family": {
+          "$ref": "#/$defs/AddressFamily"
+        },
+        "port": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "protocol": {
+          "$ref": "#/$defs/ListenerProtocol"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "protocol",
+        "address",
+        "port"
+      ]
+    },
+    "Id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "Listener": {
+      "type": "object",
+      "properties": {
+        "endpoint": {
+          "$ref": "#/$defs/Endpoint"
+        },
+        "ignored": {
+          "type": "boolean"
+        },
+        "process_reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "processes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ListenerProcess"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "endpoint",
+        "processes",
+        "ignored"
+      ]
+    },
+    "ListenerProcess": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "pid": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "pid",
+        "name"
+      ]
+    },
+    "ListenerProtocol": {
+      "type": "string",
+      "enum": [
+        "tcp",
+        "udp"
+      ]
+    },
+    "PortBaseline": {
+      "type": "object",
+      "properties": {
+        "accepted_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "endpoints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Endpoint"
+          }
+        },
+        "filter_hash": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "hash",
+        "filter_hash",
+        "accepted_at",
+        "endpoints"
+      ]
+    },
+    "PortsSnapshot": {
+      "type": "object",
+      "properties": {
+        "complete": {
+          "type": "boolean"
+        },
+        "ephemeral_range": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "ignored_count": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "listeners": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Listener"
+          }
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "processes_complete": {
+          "type": "boolean"
+        },
+        "range_fallback": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "observed_at",
+        "listeners",
+        "complete",
+        "processes_complete",
+        "ignored_count",
+        "ephemeral_range",
+        "range_fallback"
+      ]
+    },
+    "SuspiciousListener": {
+      "type": "object",
+      "properties": {
+        "endpoint": {
+          "$ref": "#/$defs/Endpoint"
+        },
+        "process_name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "endpoint",
+        "process_name"
+      ]
+    },
+    "WireVersion": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    }
+  }
+}

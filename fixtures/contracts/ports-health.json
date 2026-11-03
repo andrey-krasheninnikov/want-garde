@@ -1,0 +1,50 @@
+{
+  "version": "1",
+  "server_id": "server-demo",
+  "enabled": true,
+  "stale": false,
+  "snapshot": {
+    "observed_at": "2026-11-03T00:00:00Z",
+    "listeners": [
+      {
+        "endpoint": {
+          "family": "ipv4",
+          "protocol": "tcp",
+          "address": "127.0.0.1",
+          "port": 8080
+        },
+        "processes": [
+          {
+            "pid": 42,
+            "name": "example"
+          }
+        ],
+        "process_reason": null,
+        "ignored": false
+      }
+    ],
+    "complete": true,
+    "processes_complete": true,
+    "ignored_count": 0,
+    "ephemeral_range": [32768, 60999],
+    "range_fallback": false
+  },
+  "baseline": {
+    "revision": 1,
+    "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "filter_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+    "accepted_at": "2026-11-03T00:00:00Z",
+    "endpoints": [
+      {
+        "family": "ipv4",
+        "protocol": "tcp",
+        "address": "127.0.0.1",
+        "port": 8080
+      }
+    ]
+  },
+  "added": [],
+  "removed": [],
+  "suspicious": [],
+  "problems": []
+}

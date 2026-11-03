@@ -4,5 +4,15 @@
   "state_dir": "/var/lib/want-garde",
   "default_locale": "ru",
   "owner_user_id": null,
-  "ssh": { "mode": "auto" }
+  "ssh": {
+    "mode": "auto"
+  },
+  "services": {
+    "units": [],
+    "interval_seconds": 60
+  },
+  "ports": {
+    "enabled": true,
+    "interval_seconds": 120
+  }
 }

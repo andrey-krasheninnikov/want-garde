@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ServicesHealth",
+  "type": "object",
+  "properties": {
+    "checked_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "down": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "server_id": {
+      "$ref": "#/$defs/Id"
+    },
+    "services": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ServiceObservation"
+      }
+    },
+    "stale": {
+      "type": "boolean"
+    },
+    "version": {
+      "$ref": "#/$defs/WireVersion"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "server_id",
+    "enabled",
+    "stale",
+    "services",
+    "down"
+  ],
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "Measurement": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "available"
+            },
+            "value": {
+              "$ref": "#/$defs/ServiceStatus"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "reason_key": {
+              "$ref": "#/$defs/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "unavailable"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "reason_key"
+          ]
+        }
+      ]
+    },
+    "ServiceObservation": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/Measurement"
+        },
+        "unit": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "unit",
+        "state"
+      ]
+    },
+    "ServiceStatus": {
+      "type": "object",
+      "properties": {
+        "active_state": {
+          "type": "string"
+        },
+        "load_state": {
+          "type": "string"
+        },
+        "sub_state": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "load_state",
+        "active_state",
+        "sub_state"
+      ]
+    },
+    "WireVersion": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    }
+  }
+}

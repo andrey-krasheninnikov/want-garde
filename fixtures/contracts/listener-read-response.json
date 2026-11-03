@@ -1,0 +1,5 @@
+{
+  "type": "snapshot",
+  "ipv4": "tcp LISTEN 0 128 127.0.0.1:8080 0.0.0.0:* users:((\"example\",pid=42,fd=3))\n",
+  "ipv6": ""
+}

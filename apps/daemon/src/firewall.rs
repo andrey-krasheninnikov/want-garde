@@ -186,40 +186,13 @@ pub struct HelperClient;
 impl BansSource for HelperClient {
     async fn snapshot(&self) -> garde_config::Result<garde_contracts::BansSnapshot> {
         use garde_contracts::{BansSnapshot, HelperResponse};
-        use std::os::unix::fs::{FileTypeExt, MetadataExt};
-        use tokio::io::{AsyncReadExt, AsyncWriteExt};
         let operation = async {
-            let path = "/run/want-garde-helper.sock";
-            let metadata = std::fs::symlink_metadata(path).map_err(|_| "helper.unavailable")?;
-            if !metadata.file_type().is_socket() || metadata.uid() != 0 || metadata.mode() & 7 != 0
-            {
-                return Err("helper.peer");
-            }
-            let mut socket = tokio::net::UnixStream::connect(path)
-                .await
-                .map_err(|error| {
-                    if error.kind() == std::io::ErrorKind::PermissionDenied {
-                        "helper.permissions"
-                    } else {
-                        "helper.unavailable"
-                    }
-                })?;
-            if socket.peer_cred().map_err(|_| "helper.peer")?.uid() != 0 {
-                return Err("helper.peer");
-            }
-            socket
-                .write_all(b"{\"version\":\"1\",\"action\":{\"type\":\"fail2ban.status\"}}\n")
-                .await
-                .map_err(|_| "helper.unavailable")?;
-            let mut bytes = Vec::new();
-            socket
-                .take(65537)
-                .read_to_end(&mut bytes)
-                .await
-                .map_err(|_| "helper.output")?;
-            if bytes.len() > 65536 {
-                return Err("helper.output");
-            }
+            let bytes = crate::observation::read_helper(
+                std::path::Path::new("/run/want-garde-helper.sock"),
+                b"{\"version\":\"1\",\"action\":{\"type\":\"fail2ban.status\"}}\n",
+                65536,
+            )
+            .await?;
             match serde_json::from_slice::<HelperResponse>(&bytes).map_err(|_| "helper.output")? {
                 HelperResponse::Snapshot { snapshot } => {
                     validate_snapshot(&snapshot)?;
