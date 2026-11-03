@@ -528,7 +528,8 @@ impl Store {
             count += replies.len();
             events.push(payload);
         }
-        if publications.len() > 256 || count > 256 || now < 0 {
+        // 512 endpoints can each contribute four old and new process records.
+        if publications.len() > 1024 || count > 1024 || now < 0 {
             return Err("event.invalid");
         }
         self.admit(count as i64, now)?;

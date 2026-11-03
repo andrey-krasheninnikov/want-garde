@@ -207,3 +207,37 @@ fn monitoring_configuration_rejects_command_shapes_and_invalid_bounds() {
     assert!(c.services.units.is_empty());
     assert!(c.ports.enabled);
 }
+
+#[tokio::test]
+async fn service_aliases_report_failure_and_recovery_without_invalidating_other_units() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let mut c = config(dir.path());
+    c.services.units.push("alias.service".into());
+    let db = Database::open(c.clone()).await.unwrap();
+    let mut m = Monitor::new(c.clone(), db.clone());
+    for (at, active, reason) in [
+        (1000, "failed", "Service is not active"),
+        (1001, "active", "Service recovered"),
+    ] {
+        let row = state(active).replace(
+            "LoadState=",
+            "Names=example.service alias.service\nLoadState=",
+        );
+        m.observe(Ok(format!("{row}\n{row}")), at).await.unwrap();
+        let mut units = Vec::new();
+        while let Some(d) = db.call(move |s| s.claim(at)).await.unwrap() {
+            assert!(d.reply.text.contains(reason), "{}", d.reply.text);
+            units.push(if d.reply.text.contains("alias.service") {
+                "alias.service"
+            } else {
+                "example.service"
+            });
+            db.call(move |s| s.finish(d.id, Outcome::Delivered, at))
+                .await
+                .unwrap();
+        }
+        units.sort();
+        assert_eq!(units, vec!["alias.service", "example.service"]);
+    }
+}

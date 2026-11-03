@@ -72,9 +72,10 @@ fn parse(units: &[String], raw: Result<String>) -> Vec<ServiceObservation> {
             }
         }
         if let Some(unit) = fields.get("Id") {
-            if rows.insert(*unit, fields).is_some() {
+            if rows.get(unit).is_some_and(|previous| previous != &fields) {
                 invalid = true;
             }
+            rows.insert(*unit, fields);
         } else {
             invalid = true;
         }
@@ -85,7 +86,13 @@ fn parse(units: &[String], raw: Result<String>) -> Vec<ServiceObservation> {
             if invalid {
                 return unavailable(unit, "services.output");
             }
-            let Some(fields) = rows.get(unit.as_str()) else {
+            let Some(fields) = rows.get(unit.as_str()).or_else(|| {
+                rows.values().find(|fields| {
+                    fields
+                        .get("Names")
+                        .is_some_and(|names| names.split_whitespace().any(|name| name == unit))
+                })
+            }) else {
                 return unavailable(unit, "services.unit_missing");
             };
             let Some((&load, &active, &sub)) = fields
@@ -242,7 +249,7 @@ impl Monitor {
                 "show",
                 "--no-pager",
                 "--all",
-                "--property=Id,LoadState,ActiveState,SubState",
+                "--property=Id,Names,LoadState,ActiveState,SubState",
                 "--",
             ];
             args.extend(self.config.services.units.iter().map(String::as_str));

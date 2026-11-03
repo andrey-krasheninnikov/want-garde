@@ -404,3 +404,125 @@ async fn oversized_listener_output_and_excess_endpoints_are_visible_and_cannot_s
     assert!(h.baseline.is_none());
     assert!(h.problems.iter().any(|p| p.as_str() == "ports.limit"));
 }
+
+#[tokio::test]
+async fn invalid_process_names_preserve_endpoint_changes_and_allow_next_observations() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let c = config(dir.path());
+    let db = Database::open(c.clone()).await.unwrap();
+    let mut m = Monitor::new(c.clone(), db.clone());
+    m.observe(raw(&[]), 1000).await.unwrap();
+    drain(&db, 1000).await;
+    for (at, name) in [(1001, "bad\u{7f}name"), (1002, "bad\u{80}name")] {
+        let mut sample = raw(&[8080]);
+        sample.ipv4 = sample.ipv4.map(|s| s.replace("example", name));
+        m.observe(sample, at).await.unwrap();
+        let h = db
+            .call({
+                let c = c.clone();
+                move |s| s.ports_health(&c, at)
+            })
+            .await
+            .unwrap();
+        let snapshot = h.snapshot.unwrap();
+        assert!(snapshot.complete);
+        assert!(!snapshot.processes_complete);
+        assert!(snapshot.listeners[0].processes.is_empty());
+        assert_eq!(h.added.len(), 1);
+    }
+    drain(&db, 1002).await;
+    m.observe(raw(&[8080, 8081]), 1003).await.unwrap();
+    assert!(
+        drain(&db, 1003)
+            .await
+            .iter()
+            .any(|s| s.contains("127.0.0.1:8081"))
+    );
+}
+
+#[tokio::test]
+async fn expected_process_names_clear_only_matching_retained_warnings_with_partial_metadata() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let mut c = config(dir.path());
+    let db = Database::open(c.clone()).await.unwrap();
+    let mut m = Monitor::new(c.clone(), db.clone());
+    let mut sample = raw(&[8080, 8081]);
+    sample.ipv4 = sample
+        .ipv4
+        .map(|s| s.replace("example", "python").replacen("python", "node", 1));
+    m.observe(sample, 1000).await.unwrap();
+    drain(&db, 1000).await;
+    c.ports.expected_process_names.push("python".into());
+    let mut restarted = Monitor::new(c.clone(), db.clone());
+    let mut partial = raw(&[8080, 8081]);
+    partial.ipv4 = partial.ipv4.map(|s| {
+        s.lines()
+            .map(|line| format!("{}\n", line.split(" users:").next().unwrap()))
+            .collect()
+    });
+    restarted.observe(partial, 1001).await.unwrap();
+    let h = db.call(move |s| s.ports_health(&c, 1001)).await.unwrap();
+    assert_eq!(
+        h.suspicious
+            .iter()
+            .map(|s| s.process_name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["node"]
+    );
+    let messages = drain(&db, 1001).await;
+    assert!(
+        messages
+            .iter()
+            .any(|s| s.contains("Suspicious listener no longer observed") && s.contains("python"))
+    );
+}
+
+#[tokio::test]
+async fn every_endpoint_and_process_change_reaches_delivery_across_bounded_pages() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let c = config(dir.path());
+    let db = Database::open(c.clone()).await.unwrap();
+    let mut m = Monitor::new(c, db.clone());
+    m.observe(raw(&[]), 1000).await.unwrap();
+    drain(&db, 1000).await;
+    m.observe(raw(&(8080..8089).collect::<Vec<_>>()), 1001)
+        .await
+        .unwrap();
+    let messages = drain(&db, 1001).await;
+    for port in 8080..8089 {
+        assert!(
+            messages
+                .iter()
+                .any(|s| s.contains(&format!("127.0.0.1:{port}"))),
+            "missing port {port}"
+        );
+    }
+    for (at, first) in [(1002, 10000), (1003, 11000)] {
+        let mut sample = raw(&[]);
+        let rows = |address: &str, peer: &str| {
+            (first..first + 256).map(|port| format!("tcp LISTEN 0 128 {address}:{port} {peer}:* users:((\"bash\",pid=1,fd=3),(\"node\",pid=2,fd=3),(\"php\",pid=3,fd=3),(\"sh\",pid=4,fd=3))\n")).collect::<String>()
+        };
+        sample.ipv4 = Ok(rows("127.0.0.1", "0.0.0.0"));
+        sample.ipv6 = Ok(rows("[::1]", "[::]"));
+        m.observe(sample, at).await.unwrap();
+        let messages = drain(&db, at).await;
+        assert!(messages.iter().all(|s| s.chars().count() < 4096));
+        for port in first..first + 256 {
+            for endpoint in [format!("127.0.0.1:{port}"), format!("[::1]:{port}")] {
+                for process in ["bash", "node", "php", "sh"] {
+                    let evidence = format!("{endpoint} {process}");
+                    assert!(
+                        messages.iter().any(|s| s.contains(&evidence)),
+                        "missing {evidence}"
+                    );
+                }
+            }
+        }
+        if at == 1003 {
+            assert!(messages.iter().any(|s| s.contains("127.0.0.1:10000 bash")));
+        }
+    }
+}

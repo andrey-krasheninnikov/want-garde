@@ -147,6 +147,9 @@ fn processes(tail: &str) -> (Vec<ListenerProcess>, Option<Id>) {
         if body[end..whole.start()] != *if end == 0 { "" } else { "," } {
             return (vec![], unavailable());
         }
+        if capture[1].len() > 64 || capture[1].chars().any(char::is_control) {
+            return (vec![], unavailable());
+        }
         let Some(pid) = capture[2].parse::<u32>().ok().filter(|v| *v > 0) else {
             return (vec![], unavailable());
         };
@@ -536,7 +539,7 @@ impl Monitor {
                         ),
                         ("ports_removed", Severity::Info, removed),
                     ] {
-                        for chunk in rows.chunks(32) {
+                        for chunk in rows.chunks(8) {
                             changes.push((
                                 reason,
                                 severity,
@@ -567,6 +570,11 @@ impl Monitor {
         if !snapshot.processes_complete {
             for old in &state.suspicious {
                 if !retained.contains(old)
+                    && !self
+                        .config
+                        .ports
+                        .expected_process_names
+                        .contains(&old.process_name)
                     && (!snapshot.complete
                         || snapshot
                             .listeners
@@ -577,7 +585,7 @@ impl Monitor {
                 }
             }
         }
-        for chunk in new.chunks(32) {
+        for chunk in new.chunks(8) {
             changes.push((
                 "ports_suspicious",
                 Severity::Warning,
@@ -597,7 +605,7 @@ impl Monitor {
             .iter()
             .filter(|s| !retained.contains(s))
             .collect();
-        for chunk in ended.chunks(32) {
+        for chunk in ended.chunks(8) {
             changes.push((
                 "ports_suspicious_ended",
                 Severity::Info,
