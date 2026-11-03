@@ -335,6 +335,17 @@ impl<J: JournalSource, B: crate::firewall::BansSource> Collector<J, B> {
                     }
                 }
                 Err(code) => {
+                    if state.started_at.is_some()
+                        && state.readiness.as_deref() != Some(code)
+                        && matches!(
+                            code,
+                            "fail2ban.logging_insufficient"
+                                | "firewall.logging_disabled"
+                                | "firewall.disabled"
+                        )
+                    {
+                        state.gap(code);
+                    }
                     state.readiness = Some(code.into());
                     self.commit(state.clone(), None).await?;
                     if state.source.is_none() {

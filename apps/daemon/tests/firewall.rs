@@ -453,3 +453,92 @@ async fn failed_ban_checkpoint_does_not_acknowledge_the_input_or_lose_a_delivery
     collector.scan().await.unwrap();
     assert_eq!(database.call(|s| s.health(now())).await.unwrap().pending, 1);
 }
+
+#[tokio::test]
+async fn observed_logging_loss_remains_a_gap_after_recovery_and_restart() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+    struct Logging {
+        path: String,
+        insufficient: Arc<AtomicBool>,
+    }
+    impl garde_daemon::firewall::BansSource for Logging {
+        async fn snapshot(&self) -> Result<garde_contracts::BansSnapshot, &'static str> {
+            Ok(garde_contracts::BansSnapshot {
+                version: garde_contracts::WireVersion::V1,
+                observed_at: chrono::Utc::now(),
+                jails: vec![],
+                partial: false,
+                log_target: Some(self.path.clone()),
+                log_level: Some(
+                    if self.insufficient.load(Ordering::SeqCst) {
+                        "WARNING"
+                    } else {
+                        "INFO"
+                    }
+                    .into(),
+                ),
+            })
+        }
+    }
+    let dir = tempfile::tempdir().unwrap();
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let log = dir.path().join("fail2ban.log");
+    fs::write(&log, "").unwrap();
+    let config: Config = serde_json::from_value(serde_json::json!({
+        "server_id":"server-demo", "owner_user_id":"123456789", "default_locale":"en",
+        "bot_token_file":dir.path().join("token"), "state_dir":dir.path()
+    }))
+    .unwrap();
+    let database = Database::open(config.clone()).await.unwrap();
+    let insufficient = Arc::new(AtomicBool::new(false));
+    let source = || Logging {
+        path: log.to_str().unwrap().into(),
+        insufficient: insufficient.clone(),
+    };
+    let mut collector = Collector::with_sources(
+        Kind::Fail2ban,
+        config.clone(),
+        database.clone(),
+        garde_daemon::ingest::Journal::default(),
+        source(),
+    );
+    collector.scan().await.unwrap();
+    assert_eq!(
+        collector.health().await.unwrap().state,
+        garde_contracts::SshStatus::Healthy
+    );
+    insufficient.store(true, Ordering::SeqCst);
+    tokio::time::sleep(std::time::Duration::from_secs(16)).await;
+    collector.scan().await.unwrap();
+    let missing = collector.health().await.unwrap();
+    assert_eq!(missing.gap_count, 1);
+    assert_eq!(
+        missing.last_gap.unwrap().as_str(),
+        "fail2ban.logging_insufficient"
+    );
+    collector.scan().await.unwrap();
+    assert_eq!(collector.health().await.unwrap().gap_count, 1);
+    insufficient.store(false, Ordering::SeqCst);
+    tokio::time::sleep(std::time::Duration::from_secs(16)).await;
+    collector.scan().await.unwrap();
+    drop(collector);
+    let mut collector = Collector::with_sources(
+        Kind::Fail2ban,
+        config,
+        database,
+        garde_daemon::ingest::Journal::default(),
+        source(),
+    );
+    collector.scan().await.unwrap();
+    let recovered = collector.health().await.unwrap();
+    assert_eq!(recovered.state, garde_contracts::SshStatus::Degraded);
+    assert_eq!(recovered.gap_count, 1);
+    assert_eq!(
+        recovered.last_gap.unwrap().as_str(),
+        "fail2ban.logging_insufficient"
+    );
+    assert!(recovered.reason_key.is_none());
+}
