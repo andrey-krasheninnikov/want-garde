@@ -526,3 +526,135 @@ async fn every_endpoint_and_process_change_reaches_delivery_across_bounded_pages
         }
     }
 }
+
+#[tokio::test]
+async fn partial_warning_history_is_bounded_and_keeps_collecting_endpoint_changes() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let c = config(dir.path());
+    let db = Database::open(c.clone()).await.unwrap();
+    let mut m = Monitor::new(c.clone(), db.clone());
+    let sample = |names: &[&str]| {
+        let rows = |address: &str, peer: &str| {
+            (10000..10130)
+                .map(|port| {
+                    format!(
+                        "tcp LISTEN 0 128 {address}:{port} {peer}:* users:({})\n",
+                        names
+                            .iter()
+                            .enumerate()
+                            .map(|(i, name)| format!("(\"{name}\",pid={},fd=3)", 1000 + i))
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    )
+                })
+                .collect::<String>()
+        };
+        RawSnapshot {
+            ipv4: Ok(rows("127.0.0.1", "0.0.0.0")),
+            ipv6: Ok(rows("[::1]", "[::]")),
+            process_reason: None,
+            ephemeral_range: Some([32768, 60999]),
+        }
+    };
+    m.observe(sample(&["bash", "node", "php", "sh", "python"]), 1000)
+        .await
+        .unwrap();
+    drain(&db, 1000).await;
+    let next = sample(&["nc", "ncat", "netcat", "socat", "ruby"]);
+    m.observe(next.clone(), 1001).await.unwrap();
+    let messages = drain(&db, 1001).await;
+    assert!(
+        !messages
+            .iter()
+            .any(|s| s.contains("Suspicious listener no longer observed"))
+    );
+    let mut restarted = Monitor::new(c.clone(), db.clone());
+    restarted.observe(next.clone(), 1002).await.unwrap();
+    assert!(drain(&db, 1002).await.is_empty());
+    let h = db
+        .call({
+            let c = c.clone();
+            move |s| s.ports_health(&c, 1002)
+        })
+        .await
+        .unwrap();
+    assert!(h.suspicious.len() <= 2048);
+    assert!(h.problems.iter().any(|p| p.as_str() == "ports.limit"));
+    let mut changed = next;
+    changed
+        .ipv4
+        .as_mut()
+        .unwrap()
+        .push_str(&raw(&[8080]).ipv4.unwrap());
+    restarted.observe(changed, 1003).await.unwrap();
+    assert!(
+        drain(&db, 1003)
+            .await
+            .iter()
+            .any(|s| s.contains("127.0.0.1:8080"))
+    );
+    restarted.observe(raw(&[8080]), 1004).await.unwrap();
+    let h = db.call(move |s| s.ports_health(&c, 1004)).await.unwrap();
+    assert!(!h.problems.iter().any(|p| p.as_str() == "ports.limit"));
+}
+
+#[tokio::test]
+async fn maximum_listener_snapshot_and_warning_history_fit_the_storage_budget() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let c = config(dir.path());
+    let db = Database::open(c.clone()).await.unwrap();
+    let mut m = Monitor::new(c.clone(), db.clone());
+    for (at, names) in [
+        (1000, ["bash", "node", "php", "sh", "python"]),
+        (1001, ["nc", "ncat", "netcat", "socat", "ruby"]),
+    ] {
+        let rows = |address: &str| {
+            (10000..10256)
+                .map(|port| {
+                    format!(
+                        "tcp LISTEN 0 128 {address}:{port} *:* users:({})\n",
+                        names
+                            .iter()
+                            .enumerate()
+                            .map(|(i, name)| format!("(\"{name}\",pid={},fd=3)", i + 1))
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    )
+                })
+                .collect::<String>()
+        };
+        let v4 = rows("255.255.255.255");
+        let v6 = rows(&format!(
+            "[ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff%{}]",
+            "z".repeat(32)
+        ));
+        assert!(v4.len() <= 65536 && v6.len() <= 65536);
+        m.observe(
+            RawSnapshot {
+                ipv4: Ok(v4),
+                ipv6: Ok(v6),
+                process_reason: None,
+                ephemeral_range: Some([32768, 60999]),
+            },
+            at,
+        )
+        .await
+        .unwrap();
+        let h = db
+            .call({
+                let c = c.clone();
+                move |s| s.ports_health(&c, at)
+            })
+            .await
+            .unwrap();
+        assert_eq!(h.snapshot.unwrap().listeners.len(), 512);
+        assert_eq!(h.baseline.unwrap().endpoints.len(), 512);
+        assert_eq!(h.suspicious.len(), 2048);
+        if at == 1001 {
+            assert!(h.problems.iter().any(|p| p.as_str() == "ports.limit"));
+        }
+        drain(&db, at).await;
+    }
+}

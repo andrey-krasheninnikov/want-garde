@@ -52,6 +52,10 @@ Baseline не меняется при новых наблюдениях; пос�
 Это объяснимая эвристика по имени, а не доказательство атаки.
 Она действует и для исключённых портов, и после принятия baseline.
 `expected_process_names` исключает ожидаемые имена из этой эвристики (до 64 имён).
+История неопределённых предупреждений ограничена 2048 записями, состояние ports: 1 MiB.
+При переполнении сохраняются текущие имена и доступная часть истории; `ports.limit`
+остаётся до полного снимка процессов. Удаление неопределённой записи по лимиту
+не считается восстановлением. Сбор endpoints и их изменений продолжается.
 PID не входит в baseline; аргументы и environment не читаются и не сохраняются.
 Читается только network namespace хоста, без перебора namespaces контейнеров.
 
@@ -143,7 +147,10 @@ the old baseline. Diagnostics show ignored counts and range fallback.
 
 Shell, netcat/socat and interpreter names listed in the Russian section produce an explained
 name-based warning, including ignored endpoints and accepted baselines. This is not proof of an
-attack. Up to 64 `expected_process_names` suppress known names. PID changes do not alter the
+attack. Up to 64 `expected_process_names` suppress known names. Keep at most 2048 uncertain
+warnings within a 1 MiB ports state. Overflow retains current names and the history that fits;
+`ports.limit` persists until a complete process snapshot. Eviction of uncertain history is not
+recovery. Endpoint collection and change events continue. PID changes do not alter the
 baseline. Never collect argv or environment. Enumerate the host network namespace only.
 
 Install the separate listener socket/service with the commands above after preparing the existing

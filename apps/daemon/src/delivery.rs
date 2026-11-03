@@ -506,7 +506,7 @@ impl Store {
             "ports.state" => crate::listeners::validate_state(state)?,
             _ => return Err("monitor.state"),
         }
-        if state.len() > 524288 {
+        if state.len() > 1048576 {
             return Err("monitor.state");
         }
         if self.observation_state(key)?.as_deref() != previous {

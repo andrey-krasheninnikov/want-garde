@@ -28,6 +28,8 @@ struct State {
     baseline: Option<PortBaseline>,
     last: Vec<Endpoint>,
     suspicious: Vec<SuspiciousListener>,
+    #[serde(default)]
+    warnings_limited: bool,
     problems: Vec<Id>,
 }
 fn digest<T: Serialize>(value: &T) -> Result<String> {
@@ -37,7 +39,7 @@ fn digest<T: Serialize>(value: &T) -> Result<String> {
     ))
 }
 fn decode(raw: &str) -> Result<State> {
-    if raw.len() > 524288 {
+    if raw.len() > 1048576 {
         return Err("ports.state");
     }
     let state: State = serde_json::from_str(raw).map_err(|_| "ports.state")?;
@@ -509,6 +511,7 @@ impl Monitor {
             baseline: None,
             last: vec![],
             suspicious: vec![],
+            warnings_limited: false,
             problems: vec![],
         });
         type Change = (&'static str, Severity, Vec<(&'static str, String)>);
@@ -619,6 +622,13 @@ impl Monitor {
                     })
                     .collect(),
             ));
+        }
+        state.warnings_limited =
+            retained.len() > 2048 || (state.warnings_limited && !snapshot.processes_complete);
+        // Keep current names first; eviction of uncertain history is not recovery.
+        retained.truncate(2048);
+        if state.warnings_limited {
+            problems.push(Id::new("ports.limit")?);
         }
         state.suspicious = retained;
         state.suspicious.sort();
