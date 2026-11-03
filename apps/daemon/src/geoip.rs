@@ -427,8 +427,9 @@ pub async fn run_once(database: &Database, provider: &impl Provider, now: i64) -
     let result = tokio::time::timeout(Duration::from_secs(2), provider.lookup(&ip))
         .await
         .unwrap_or_else(|_| Err(failure("geoip_timeout")));
+    let completed_at = now.max(crate::runtime::now());
     database
-        .call(move |s| s.finish_geoip(&ip, result, now))
+        .call(move |s| s.finish_geoip(&ip, result, completed_at))
         .await?;
     Ok(true)
 }
@@ -451,6 +452,26 @@ pub(crate) async fn run(config: Config, database: Database) -> Result<()> {
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
 }
+fn retry_after(value: &str, now: i64) -> Option<u64> {
+    if let Ok(seconds) = value.parse::<u64>() {
+        return Some(seconds);
+    }
+    let at = chrono::DateTime::parse_from_rfc2822(value)
+        .ok()
+        .map(|at| at.timestamp())
+        .or_else(|| {
+            chrono::NaiveDateTime::parse_from_str(value, "%A, %d-%b-%y %H:%M:%S GMT")
+                .ok()
+                .map(|at| at.and_utc().timestamp())
+        })
+        .or_else(|| {
+            chrono::NaiveDateTime::parse_from_str(value, "%a %b %e %H:%M:%S %Y")
+                .ok()
+                .map(|at| at.and_utc().timestamp())
+        })?;
+    Some(at.saturating_sub(now).max(0) as u64)
+}
+
 pub struct IpInfo {
     client: reqwest::Client,
     token_file: Option<std::path::PathBuf>,
@@ -508,22 +529,21 @@ impl Provider for IpInfo {
                 })
             })?;
         let status = response.status().as_u16();
-        if status == 429 {
-            return Err(LookupFailure {
-                reason: "geoip_rate_limited",
-                retry_after: response
-                    .headers()
-                    .get("retry-after")
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|v| v.parse().ok())
-                    .unwrap_or(900),
-            });
-        }
-        if matches!(status, 401 | 403) {
-            return Err(failure("geoip_token"));
-        }
         if status != 200 {
-            return Err(failure("geoip_unavailable"));
+            let retry_after = response
+                .headers()
+                .get("retry-after")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| retry_after(v, crate::runtime::now()))
+                .unwrap_or(900);
+            return Err(LookupFailure {
+                reason: match status {
+                    429 => "geoip_rate_limited",
+                    401 | 403 => "geoip_token",
+                    _ => "geoip_unavailable",
+                },
+                retry_after,
+            });
         }
         if response.content_length().is_some_and(|n| n > 16384) {
             return Err(failure("geoip_response"));
@@ -766,5 +786,62 @@ mod http_tests {
                 .reason,
             "geoip_response"
         );
+    }
+    #[tokio::test]
+    async fn service_unavailable_retry_after_survives_into_the_persisted_cooldown() {
+        let clock = crate::runtime::now();
+        let future = chrono::DateTime::from_timestamp(clock + 3600, 0).unwrap();
+        let headers = vec![
+            "3600".to_string(),
+            future.format("%a, %d %b %Y %H:%M:%S GMT").to_string(),
+            future.format("%A, %d-%b-%y %H:%M:%S GMT").to_string(),
+            future.format("%a %b %e %H:%M:%S %Y").to_string(),
+        ];
+        for value in headers {
+            let error = request("503 Unavailable", &format!("Retry-After: {value}\r\n"), "")
+                .await
+                .err()
+                .unwrap();
+            assert!(
+                (3590..=3600).contains(&error.retry_after),
+                "Retry-After was discarded"
+            );
+            let dir = tempfile::tempdir().unwrap();
+            std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+            let config: Config=serde_json::from_value(serde_json::json!({"server_id":"server-demo","owner_user_id":"123456789","bot_token_file":dir.path().join("token"),"state_dir":dir.path(),"default_locale":"en","geoip":{"enabled":true,"token_file":dir.path().join("geo-token")}})).unwrap();
+            let database = Database::open(config).await.unwrap();
+            let mut event: Event =
+                serde_json::from_str(include_str!("../../../fixtures/contracts/event.json"))
+                    .unwrap();
+            event.evidence = vec![garde_contracts::Evidence {
+                name: Id::new("ip").unwrap(),
+                value: "8.8.8.8".into(),
+            }];
+            database
+                .call(move |s| s.publish(&event, &[], clock))
+                .await
+                .unwrap();
+            assert!(
+                database
+                    .call(move |s| s.claim_geoip(clock))
+                    .await
+                    .unwrap()
+                    .is_some()
+            );
+            let delay = error.retry_after;
+            database
+                .call(move |s| s.finish_geoip("8.8.8.8", Err(error), clock))
+                .await
+                .unwrap();
+            let health = database
+                .call(move |s| s.geoip_health(clock + 901))
+                .await
+                .unwrap();
+            assert_eq!(
+                health.cooldown_until.unwrap().timestamp(),
+                clock + delay as i64
+            );
+            assert_eq!(health.reason_key.as_str(), "geoip_unavailable");
+        }
     }
 }
