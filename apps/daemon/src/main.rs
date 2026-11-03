@@ -34,21 +34,24 @@ async fn run() -> ExitCode {
     }
     if args == ["--help"] {
         println!(
-            "{}: want-garde-daemon [--lang LOCALE] [--check-config | --delivery-status | --ssh-status] --config PATH",
+            "{}: want-garde-daemon [--lang LOCALE] [--check-config | --delivery-status | --ssh-status | --firewall-status] --config PATH",
             message(locale, "usage")
         );
         return ExitCode::SUCCESS;
     }
-    let (check, diagnostic, ssh_diagnostic, path) = match args {
-        [flag, path] if flag == "--config" => (false, false, false, path),
+    let (check, diagnostic, ssh_diagnostic, firewall_diagnostic, path) = match args {
+        [flag, path] if flag == "--config" => (false, false, false, false, path),
         [check, flag, path] if check == "--check-config" && flag == "--config" => {
-            (true, false, false, path)
+            (true, false, false, false, path)
         }
         [diagnostic, flag, path] if diagnostic == "--delivery-status" && flag == "--config" => {
-            (false, true, false, path)
+            (false, true, false, false, path)
         }
         [diagnostic, flag, path] if diagnostic == "--ssh-status" && flag == "--config" => {
-            (false, false, true, path)
+            (false, false, true, false, path)
+        }
+        [diagnostic, flag, path] if diagnostic == "--firewall-status" && flag == "--config" => {
+            (false, false, false, true, path)
         }
         _ => {
             eprintln!("request.invalid: {}", message(locale, "operation_failed"));
@@ -56,14 +59,14 @@ async fn run() -> ExitCode {
         }
     };
     let config = match Config::load(Path::new(path)).and_then(|c| {
-        if !diagnostic && !ssh_diagnostic {
+        if !diagnostic && !ssh_diagnostic && !firewall_diagnostic {
             c.validate_runtime()?;
         }
         Ok(c)
     }) {
         Ok(config) => config,
         Err(code) => {
-            if diagnostic || ssh_diagnostic {
+            if diagnostic || ssh_diagnostic || firewall_diagnostic {
                 return diagnostic_error(code);
             }
             eprintln!("{code}: {}", message(locale, "operation_failed"));
@@ -72,6 +75,30 @@ async fn run() -> ExitCode {
     };
     if !explicit_locale {
         locale = &config.default_locale;
+    }
+    if firewall_diagnostic {
+        return match garde_daemon::delivery::Store::inspect_firewall(
+            &config,
+            garde_daemon::runtime::now(),
+        ) {
+            Ok(health) => {
+                let healthy = [&health.fail2ban, &health.firewall]
+                    .iter()
+                    .all(|h| h.state == garde_contracts::SshStatus::Healthy);
+                match serde_json::to_string(&health) {
+                    Ok(json) => {
+                        println!("{json}");
+                        if healthy {
+                            ExitCode::SUCCESS
+                        } else {
+                            ExitCode::from(1)
+                        }
+                    }
+                    Err(_) => diagnostic_error("firewall.state"),
+                }
+            }
+            Err(code) => diagnostic_error(code),
+        };
     }
     if ssh_diagnostic {
         return match garde_daemon::delivery::Store::inspect_ssh(

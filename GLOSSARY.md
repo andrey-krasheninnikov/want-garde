@@ -93,3 +93,7 @@ _Avoid_: Event / Событие, когда речь об отправке со�
 **Coverage gap / Пропуск наблюдения**
 
 Интервал, для которого установка не может подтвердить полноту собранных наблюдений. Восстановление доступности источника не устраняет уже возникший пропуск. / An interval for which the installation cannot establish complete observation coverage. Restoring source availability does not erase an earlier gap.
+
+**Jail / Jail fail2ban**
+
+Именованный набор правил обнаружения и блокировок fail2ban с текущим списком заблокированных адресов. Просмотр jail не даёт разрешения на unban. / A named fail2ban detection and banning configuration with a current list of banned addresses. Reading a jail grants no unban authority.

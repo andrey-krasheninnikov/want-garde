@@ -1,0 +1,18 @@
+{
+  "type": "snapshot",
+  "snapshot": {
+    "version": "1",
+    "observed_at": "2026-11-03T00:10:00Z",
+    "jails": [
+      {
+        "jail": "sshd",
+        "current_banned": 2,
+        "addresses": ["192.0.2.42", "2001:db8::42"],
+        "reason_key": null
+      }
+    ],
+    "partial": false,
+    "log_target": "/var/log/fail2ban.log",
+    "log_level": "INFO"
+  }
+}

@@ -39,3 +39,19 @@ fn bounds_even_valid_json_whitespace_at_the_transport_boundary() {
     assert!(decode_request(&at_limit).is_ok());
     assert!(decode_request(&(at_limit + " ")).is_err());
 }
+
+#[test]
+fn decodes_read_only_fail2ban_status_and_rejects_operation_parameters() {
+    let input = r#"{"version":"1","request_id":"bans-001","server_id":"server-demo","action":{"type":"fail2ban.status"}}"#;
+    assert_eq!(
+        decode_request(input).unwrap().action,
+        Action::Fail2banStatus {}
+    );
+    assert!(
+        decode_request(&input.replace(
+            "\"fail2ban.status\"",
+            "\"fail2ban.status\",\"command\":\"unbanip\""
+        ))
+        .is_err()
+    );
+}

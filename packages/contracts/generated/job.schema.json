@@ -28,6 +28,46 @@
     "state"
   ],
   "$defs": {
+    "BansSnapshot": {
+      "type": "object",
+      "properties": {
+        "jails": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/JailBans"
+          }
+        },
+        "log_level": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "log_target": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "partial": {
+          "type": "boolean"
+        },
+        "version": {
+          "$ref": "#/$defs/WireVersion"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "observed_at",
+        "jails",
+        "partial"
+      ]
+    },
     "ByteUsage": {
       "type": "object",
       "properties": {
@@ -124,6 +164,43 @@
     "Id": {
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "JailBans": {
+      "type": "object",
+      "properties": {
+        "addresses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "current_banned": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "jail": {
+          "$ref": "#/$defs/Id"
+        },
+        "reason_key": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "jail",
+        "addresses"
+      ]
     },
     "JobState": {
       "oneOf": [
@@ -446,6 +523,27 @@
     },
     "OperationResult": {
       "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "server_id": {
+              "$ref": "#/$defs/Id"
+            },
+            "snapshot": {
+              "$ref": "#/$defs/BansSnapshot"
+            },
+            "type": {
+              "type": "string",
+              "const": "fail2ban_status"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "server_id",
+            "snapshot"
+          ]
+        },
         {
           "type": "object",
           "properties": {

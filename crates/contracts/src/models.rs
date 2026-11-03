@@ -72,6 +72,8 @@ pub struct Incident {
 pub enum Capability {
     #[serde(rename = "status.read")]
     StatusRead,
+    #[serde(rename = "bans.read")]
+    BansRead,
     #[serde(rename = "events.read")]
     EventsRead,
     #[serde(rename = "incidents.read")]
@@ -98,6 +100,10 @@ pub struct Grant {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, TS)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum OperationResult {
+    Fail2banStatus {
+        server_id: Id,
+        snapshot: Box<crate::BansSnapshot>,
+    },
     ServerStatus {
         server_id: Id,
         product_version: String,

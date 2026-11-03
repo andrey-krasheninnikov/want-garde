@@ -86,3 +86,34 @@ const ssh: SshHealth = {
 // @ts-expect-error Source health uses explicit coverage states.
 const invalidSsh: SshHealth["state"] = "complete";
 void [ssh, invalidSsh];
+
+const bansAction: Action = { type: "fail2ban.status" };
+const bans: import("../generated/index").BansSnapshot = {
+  version: "1",
+  observed_at: "2026-11-03T00:10:00Z",
+  jails: [],
+  partial: false,
+  log_target: null,
+  log_level: null,
+};
+const firewall: import("../generated/index").FirewallHealth = {
+  version: "1",
+  server_id: "server-demo",
+  observed_at: "2026-11-03T00:10:00Z",
+  backend: "ufw",
+  fail2ban: ssh,
+  firewall: ssh,
+};
+const bansResult: OperationResult = {
+  type: "fail2ban_status",
+  server_id: "server-demo",
+  snapshot: bans,
+};
+const invalidBan: import("../generated/index").JailBans = {
+  jail: "sshd",
+  // @ts-expect-error Unknown counts use null, not a text value.
+  current_banned: "unknown",
+  addresses: [],
+  reason_key: null,
+};
+void [bansAction, bansResult, firewall, invalidBan];

@@ -484,7 +484,14 @@ dependencies = [
 name = "garde-helper"
 version = "0.1.0-dev.0"
 dependencies = [
+ "chrono",
+ "garde-config",
+ "garde-contracts",
  "garde-entrypoint",
+ "rustix",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

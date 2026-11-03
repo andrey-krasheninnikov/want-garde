@@ -1,0 +1,38 @@
+{
+  "version": "1",
+  "server_id": "server-demo",
+  "observed_at": "2026-11-03T00:10:00Z",
+  "backend": "ufw",
+  "fail2ban": {
+    "version": "1",
+    "server_id": "server-demo",
+    "observed_at": "2026-11-03T00:10:00Z",
+    "source": "file",
+    "state": "healthy",
+    "reason_key": null,
+    "file_path": "/var/log/fail2ban.log",
+    "coverage_started_at": "2026-11-03T00:00:00Z",
+    "checked_at": "2026-11-03T00:10:00Z",
+    "last_record_at": "2026-11-03T00:09:00Z",
+    "skipped_records": 0,
+    "gap_count": 0,
+    "last_gap": null,
+    "last_gap_at": null
+  },
+  "firewall": {
+    "version": "1",
+    "server_id": "server-demo",
+    "observed_at": "2026-11-03T00:10:00Z",
+    "source": "file",
+    "state": "healthy",
+    "reason_key": null,
+    "file_path": "/var/log/ufw.log",
+    "coverage_started_at": "2026-11-03T00:00:00Z",
+    "checked_at": "2026-11-03T00:10:00Z",
+    "last_record_at": "2026-11-03T00:09:00Z",
+    "skipped_records": 0,
+    "gap_count": 0,
+    "last_gap": null,
+    "last_gap_at": null
+  }
+}

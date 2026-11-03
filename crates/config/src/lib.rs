@@ -20,20 +20,35 @@ pub struct Config {
     pub owner_user_id: Option<String>,
     #[serde(default)]
     pub ssh: SshConfig,
+    #[serde(default)]
+    pub fail2ban: LogConfig,
+    #[serde(default)]
+    pub firewall: FirewallConfig,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
-pub enum SshConfig {
+pub enum LogConfig {
     Auto {},
     Journald {},
     File { path: PathBuf },
 }
-impl Default for SshConfig {
+impl Default for LogConfig {
     fn default() -> Self {
         Self::Auto {}
     }
 }
+
+pub type SshConfig = LogConfig;
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct FirewallConfig {
+    pub source: LogConfig,
+    pub backend: FirewallBackend,
+    pub log_prefix: Option<String>,
+}
+pub use garde_contracts::FirewallBackend;
 
 pub fn valid_user_id(value: &str) -> bool {
     !value.starts_with('0')
@@ -88,7 +103,18 @@ impl Config {
         }
         let value: Self =
             serde_json::from_slice(&read_private(path, 65536)?).map_err(|_| "config.invalid")?;
-        if matches!(&value.ssh, SshConfig::File { path } if !path.is_absolute() || path.components().any(|p| matches!(p, std::path::Component::ParentDir)) || path.as_os_str().len() > 4096)
+        let valid_source = |source: &SshConfig| !matches!(source, SshConfig::File { path } if !path.is_absolute() || path.components().any(|p| matches!(p, std::path::Component::ParentDir)) || path.as_os_str().len() > 4096);
+        if !valid_source(&value.ssh)
+            || !valid_source(&value.fail2ban)
+            || !valid_source(&value.firewall.source)
+            || value.firewall.log_prefix.as_ref().is_some_and(|p| {
+                p.is_empty()
+                    || p.len() > 64
+                    || !p.is_ascii()
+                    || p.bytes().any(|b| b.is_ascii_control())
+            })
+            || (value.firewall.backend == FirewallBackend::Nftables
+                && value.firewall.log_prefix.is_none())
             || !value.bot_token_file.is_absolute()
             || !value.state_dir.is_absolute()
             || value.bot_token_file == path

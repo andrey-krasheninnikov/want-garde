@@ -34,6 +34,8 @@ async fn native_journal_tail_restart_and_missing_cursor() {
         owner_user_id: Some("123456789".into()),
         bot_token_file: dir.path().join("absent-token"),
         state_dir: dir.path().into(),
+        fail2ban: Default::default(),
+        firewall: Default::default(),
         default_locale: "en".into(),
         ssh: SshConfig::Journald {},
     };
@@ -75,4 +77,34 @@ async fn native_journal_access_denial() {
         .query(JournalQuery::Tail)
         .await;
     assert!(result.is_err());
+}
+
+#[tokio::test]
+#[ignore = "requires an isolated journal, service journal access and a non-root emitter"]
+async fn native_journal_rejects_a_user_supplied_fail2ban_identifier() {
+    assert_ne!(rustix::process::geteuid().as_raw(), 0);
+    emit("Accepted password for old-fixture from 192.0.2.1 port 1111 ssh2");
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    let journal =
+        Journal::namespace_for_source(garde_daemon::ingest::Kind::Fail2ban, &namespace()).unwrap();
+    let tail = journal.query(JournalQuery::Tail).await.unwrap();
+    let cursor = tail.last().unwrap()["__CURSOR"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(
+        Command::new("/usr/bin/logger")
+            .args(["-t", "fail2ban", "--", "[sshd] Ban 192.0.2.42"])
+            .status()
+            .unwrap()
+            .success()
+    );
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert!(
+        journal
+            .query(JournalQuery::After { cursor })
+            .await
+            .unwrap()
+            .is_empty()
+    );
 }

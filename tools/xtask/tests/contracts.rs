@@ -67,6 +67,18 @@ fn schemas_match_valid_examples_and_reject_the_negative_request_corpus() {
         ),
         ("job", include_str!("../../../fixtures/contracts/job.json")),
         (
+            "bans-snapshot",
+            include_str!("../../../fixtures/contracts/bans-snapshot.json"),
+        ),
+        (
+            "firewall-health",
+            include_str!("../../../fixtures/contracts/firewall-health.json"),
+        ),
+        (
+            "helper-response",
+            include_str!("../../../fixtures/contracts/helper-response.json"),
+        ),
+        (
             "host-snapshot",
             include_str!("../../../fixtures/contracts/host-snapshot.json"),
         ),

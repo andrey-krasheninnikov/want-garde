@@ -20,6 +20,9 @@ pub fn contract_artifacts() -> Result<BTreeMap<&'static str, String>, serde_json
     schema!("delivery-health.schema.json", DeliveryHealth);
 
     schema!("ssh-health.schema.json", SshHealth);
+    schema!("firewall-health.schema.json", FirewallHealth);
+    schema!("bans-snapshot.schema.json", BansSnapshot);
+    schema!("helper-response.schema.json", HelperResponse);
 
     let mut types = format!(
         "export const PRODUCT_VERSION = {:?} as const;\nexport const CONTRACT_VERSION = \"1\" as const;\n",
@@ -54,11 +57,17 @@ pub fn contract_artifacts() -> Result<BTreeMap<&'static str, String>, serde_json
         DeliveryHealth,
         SshSourceKind,
         SshStatus,
-        SshHealth,
+        SourceHealth,
+        FirewallBackend,
+        FirewallHealth,
+        JailBans,
+        BansSnapshot,
+        HelperResponse,
         OperationResult,
         JobState,
         Job,
     );
+    types.push_str("export type SshHealth = SourceHealth;\n");
     files.insert("index.ts", types);
     Ok(files)
 }

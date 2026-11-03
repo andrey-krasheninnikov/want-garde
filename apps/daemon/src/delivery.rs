@@ -318,15 +318,14 @@ impl Store {
         self.publish_checkpoint(Some(event), replies, now, None)
     }
 
-    pub(crate) fn ssh_state(&self) -> Result<Option<String>> {
+    pub(crate) fn source_state(&self, kind: crate::ingest::Kind) -> Result<Option<String>> {
         sql(self
             .connection
-            .query_row("SELECT value FROM meta WHERE key='ssh.state'", [], |r| {
+            .query_row("SELECT value FROM meta WHERE key=?1", [kind.key()], |r| {
                 r.get(0)
             })
             .optional())
     }
-
     pub(crate) fn publish_checkpoint(
         &mut self,
         event: Option<&Event>,
@@ -334,8 +333,19 @@ impl Store {
         now: i64,
         checkpoint: Option<&str>,
     ) -> Result<()> {
+        self.publish_source_checkpoint(event, replies, now, checkpoint, crate::ingest::Kind::Ssh)
+    }
+
+    pub(crate) fn publish_source_checkpoint(
+        &mut self,
+        event: Option<&Event>,
+        replies: &[Reply],
+        now: i64,
+        checkpoint: Option<&str>,
+        kind: crate::ingest::Kind,
+    ) -> Result<()> {
         if let Some(checkpoint) = checkpoint {
-            crate::ssh::State::decode(checkpoint)?;
+            crate::ingest::State::decode(checkpoint)?;
         }
         let Some(event) = event else {
             if checkpoint.is_some() {
@@ -343,7 +353,7 @@ impl Store {
             }
             let transaction = sql(self.connection.transaction())?;
             if let Some(checkpoint) = checkpoint {
-                sql(transaction.execute("INSERT INTO meta VALUES('ssh.state',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",[checkpoint]))?;
+                sql(transaction.execute("INSERT INTO meta VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",params![kind.key(),checkpoint]))?;
             }
             return sql(transaction.commit());
         };
@@ -379,7 +389,7 @@ impl Store {
             if serde_json::to_string(&replay).map_err(|_| "event.invalid")? != existing {
                 return Err("event.conflict");
             }
-            return self.publish_checkpoint(None, &[], now, checkpoint);
+            return self.publish_source_checkpoint(None, &[], now, checkpoint, kind);
         }
         self.admit(replies.len() as i64, now)?;
         let transaction = sql(self.connection.transaction())?;
@@ -398,7 +408,7 @@ impl Store {
             )?;
         }
         if let Some(checkpoint) = checkpoint {
-            sql(transaction.execute("INSERT INTO meta VALUES('ssh.state',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",[checkpoint]))?;
+            sql(transaction.execute("INSERT INTO meta VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",params![kind.key(),checkpoint]))?;
         }
         sql(transaction.commit())
     }
@@ -514,6 +524,27 @@ impl Store {
     ) -> Result<garde_contracts::SshHealth> {
         ssh_health(&self.connection, config, now)
     }
+    pub fn firewall_health(
+        &self,
+        config: &garde_config::Config,
+        now: i64,
+    ) -> Result<garde_contracts::FirewallHealth> {
+        firewall_health(&self.connection, config, now)
+    }
+    pub fn inspect_firewall(
+        config: &garde_config::Config,
+        now: i64,
+    ) -> Result<garde_contracts::FirewallHealth> {
+        firewall_health(
+            &inspect_connection(
+                &config.state_dir,
+                config.server_id.as_str(),
+                config.owner()?,
+            )?,
+            config,
+            now,
+        )
+    }
     pub fn inspect_ssh(
         config: &garde_config::Config,
         now: i64,
@@ -570,6 +601,46 @@ fn ssh_health(
         .transpose()?
         .unwrap_or_else(|| crate::ssh::State::new(config));
     Ok(state.health(&config.server_id, now))
+}
+
+fn firewall_health(
+    connection: &Connection,
+    config: &garde_config::Config,
+    now: i64,
+) -> Result<garde_contracts::FirewallHealth> {
+    use crate::ingest::{Kind, State};
+    let source = |kind: Kind| -> Result<garde_contracts::SourceHealth> {
+        let saved: Option<String> = sql(connection
+            .query_row("SELECT value FROM meta WHERE key=?1", [kind.key()], |r| {
+                r.get(0)
+            })
+            .optional())?;
+        let state = saved.map(|s| State::decode(&s)).transpose();
+        Ok(match state {
+            Ok(state) => state
+                .unwrap_or_else(|| State::new_for(config, kind))
+                .health_for(&config.server_id, now, kind),
+            Err(_) => {
+                let mut health =
+                    State::new_for(config, kind).health_for(&config.server_id, now, kind);
+                health.state = garde_contracts::SshStatus::Unavailable;
+                health.reason_key = Some(Id::new(if kind == Kind::Fail2ban {
+                    "fail2ban.state"
+                } else {
+                    "firewall.state"
+                })?);
+                health
+            }
+        })
+    };
+    Ok(garde_contracts::FirewallHealth {
+        version: WireVersion::V1,
+        server_id: config.server_id.clone(),
+        observed_at: timestamp(now)?,
+        backend: config.firewall.backend,
+        fail2ban: source(Kind::Fail2ban)?,
+        firewall: source(Kind::Firewall)?,
+    })
 }
 
 fn timestamp(value: i64) -> Result<DateTime<Utc>> {

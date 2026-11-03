@@ -72,3 +72,16 @@ fn open_incident_rejects_extra_fields_but_accepts_the_documented_shape() {
     let decoded: Incident = serde_json::from_value(valid.clone()).unwrap();
     assert_eq!(serde_json::to_value(decoded).unwrap(), valid);
 }
+
+#[test]
+fn firewall_observations_and_live_bans_preserve_wire_examples() {
+    roundtrip::<garde_contracts::BansSnapshot>(include_str!(
+        "../../../fixtures/contracts/bans-snapshot.json"
+    ));
+    roundtrip::<garde_contracts::FirewallHealth>(include_str!(
+        "../../../fixtures/contracts/firewall-health.json"
+    ));
+    roundtrip::<garde_contracts::HelperResponse>(include_str!(
+        "../../../fixtures/contracts/helper-response.json"
+    ));
+}

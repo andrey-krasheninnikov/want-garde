@@ -8,6 +8,8 @@ fn delivery_diagnostics_are_read_only_json_and_work_without_a_token() {
         server_id: garde_contracts::Id::new("diagnostic-host").unwrap(),
         bot_token_file: dir.path().join("absent-token"),
         state_dir: dir.path().into(),
+        fail2ban: Default::default(),
+        firewall: Default::default(),
         default_locale: "en".into(),
         ssh: Default::default(),
         owner_user_id: Some("123456789".into()),
@@ -101,4 +103,25 @@ fn validates_local_configuration_without_network_and_never_echoes_secrets() {
     assert!(!String::from_utf8_lossy(&bad.stderr).contains("synthetic_secret"));
     fs::remove_file(&path).unwrap();
     fs::remove_file(&token).unwrap();
+}
+
+#[test]
+fn firewall_diagnostics_are_read_only_and_do_not_need_the_token() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let path = dir.path().join("config.json");
+    fs::write(&path,format!(r#"{{"server_id":"diagnostic-host","owner_user_id":"123456789","default_locale":"en","bot_token_file":"{}/absent","state_dir":"{}"}}"#,dir.path().display(),dir.path().display())).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+    let _store =
+        garde_daemon::delivery::Store::open(dir.path(), "diagnostic-host", "123456789").unwrap();
+    let before = fs::read(dir.path().join("garde.sqlite3")).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_want-garde-daemon"))
+        .args(["--firewall-status", "--config", path.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    let health: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(health["fail2ban"]["state"], "starting");
+    assert_eq!(health["firewall"]["state"], "starting");
+    assert_eq!(before, fs::read(dir.path().join("garde.sqlite3")).unwrap());
 }

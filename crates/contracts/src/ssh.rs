@@ -23,7 +23,7 @@ pub enum SshStatus {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
 #[serde(deny_unknown_fields)]
-pub struct SshHealth {
+pub struct SourceHealth {
     pub version: WireVersion,
     pub server_id: Id,
     pub observed_at: DateTime<Utc>,
@@ -39,3 +39,5 @@ pub struct SshHealth {
     pub last_gap: Option<Id>,
     pub last_gap_at: Option<DateTime<Utc>>,
 }
+
+pub type SshHealth = SourceHealth;

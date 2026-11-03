@@ -46,6 +46,8 @@ pub enum WireVersion {
 pub enum Action {
     #[serde(rename = "server.status")]
     ServerStatus {},
+    #[serde(rename = "fail2ban.status")]
+    Fail2banStatus {},
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
@@ -100,3 +102,6 @@ pub use delivery::*;
 
 mod ssh;
 pub use ssh::*;
+
+mod firewall;
+pub use firewall::*;
