@@ -112,7 +112,7 @@ sudo systemctl start want-garde.service
 Перед обновлением сохраните закрытую копию configuration/state при остановленном writer
 и прежнюю версию. SQLite schema остаётся 1; версии #7 игнорируют новые metadata.
 При откате остановите и отключите только новый listener socket, верните прежние binaries,
-сохраните новые данные и backup. Не восстанавливайте старую базу поверх новых данных автоматически.
+сохраните новые данные и backup. Версия #7 отклоняет новые секции `services`/`ports`: перед её запуском удалите эти секции из копии текущей конфигурации либо верните прежнюю конфигурацию после проверки последующих изменений. Не восстанавливайте старую базу поверх новых данных автоматически.
 
 ## English
 
@@ -169,5 +169,5 @@ never changes the baseline. No Telegram baseline mutation is exposed.
 Before rollout, retain a private stopped-writer configuration/state backup and previous binaries.
 Schema 1 stays compatible with #7, which ignores the added metadata. Rollback disables only the
 new listener socket and restores previous binaries while retaining new data and the backup.
-Never automatically overwrite newer data with an older database. Linux runtime acceptance is
+Version #7 rejects the new `services`/`ports` configuration sections: remove them from a copy of the current configuration or restore the previous configuration after checking subsequent edits. Never automatically overwrite newer data with an older database. Linux runtime acceptance is
 separate from macOS checks; the remaining distribution/ARM64 matrix belongs to #32.
