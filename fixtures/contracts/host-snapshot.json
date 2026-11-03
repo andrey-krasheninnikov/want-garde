@@ -34,5 +34,18 @@
   "root_disk": {
     "type": "unavailable",
     "reason_key": "source.read"
+  },
+  "cpu_count": {
+    "type": "available",
+    "value": 2
+  },
+  "load_per_core": {
+    "type": "available",
+    "value": [0.0, 0.0, 0.0]
+  },
+  "disks": [],
+  "reboot_required": {
+    "type": "unavailable",
+    "reason_key": "host.reboot_unsupported"
   }
 }

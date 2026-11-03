@@ -36,6 +36,7 @@ async fn native_journal_tail_restart_and_missing_cursor() {
         state_dir: dir.path().into(),
         fail2ban: Default::default(),
         firewall: Default::default(),
+        host_health: Default::default(),
         default_locale: "en".into(),
         ssh: SshConfig::Journald {},
     };
