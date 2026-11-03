@@ -4,7 +4,7 @@
 
 Исходные Rust DTO находятся в crates/contracts. JSON Schema и TypeScript находятся в packages/contracts/generated. Команда cargo xtask contracts обновляет их; --check только сравнивает. Не редактируйте производные файлы вручную.
 
-Wire version передаётся строкой "1" и не совпадает с SemVer продукта. Запросы принимают только известные поля и действия. Единственное начальное действие: server.status без параметров. Daemon #3 реализует это действие для локально привязанного владельца в личном Telegram-чате. CLI реализует локальную привязку; helper/MCP остаются каркасом.
+Wire version передаётся строкой "1" и не совпадает с SemVer продукта. Запросы принимают только известные поля и действия. Действия чтения: server.status и fail2ban.status без параметров. Daemon #3 реализует это действие для локально привязанного владельца в личном Telegram-чате. CLI реализует локальную привязку; helper предоставляет отдельный ограниченный read-протокол; MCP остаётся каркасом.
 
 ID являются непустыми ASCII-строками до 128 символов: первый символ буква или цифра, остальные также допускают точку, подчёркивание, двоеточие и дефис. Это сохраняет точность JavaScript. Telegram chat ID в Scope передаются отдельными десятичными строками; проверка подлинности и допустимости выполняется прикладной политикой в #15. Время событий и инцидентов имеет формат RFC 3339.
 
@@ -27,7 +27,7 @@ State/result являются discriminated unions. Success содержит т�
 
 Rust DTOs in crates/contracts own the contracts. JSON Schema and TypeScript live in packages/contracts/generated. Run cargo xtask contracts to update them; --check only compares. Never hand-edit derived files.
 
-Wire version is the string "1", distinct from product SemVer. Requests accept only known fields/actions. The initial action is server.status with no arguments. The #3 daemon implements this action for the locally bound owner in a private Telegram chat. The CLI implements local binding; helper/MCP remain scaffolds.
+Wire version is the string "1", distinct from product SemVer. Requests accept only known fields/actions. Read actions are server.status and fail2ban.status without arguments. The #3 daemon implements this action for the locally bound owner in a private Telegram chat. The CLI implements local binding; the helper exposes a separate restricted read protocol; MCP remains a scaffold.
 
 IDs are nonempty ASCII strings up to 128 characters: the first character is alphanumeric; remaining characters additionally allow dot, underscore, colon, and hyphen. This preserves JavaScript precision. Telegram chat IDs in Scope are separate decimal strings; application policy in #15 validates authenticity and permission. Event/incident timestamps use RFC 3339.
 
@@ -67,3 +67,9 @@ DeliveryHealth добавлен отдельным DTO wire version "1". Он с
 `SshHealth` описывает доступность выбранного SSH-источника, начало покрытия, время успешной проверки, последнюю запись, неподдержанные записи и сохраняемые пропуски. Состояния: `starting`, `healthy`, `degraded`, `unavailable`. Контракт не содержит сырых журналов или токена.
 
 `SshHealth` describes selected-source availability, coverage start, successful check and record times, unsupported records, and persistent gaps. States are `starting`, `healthy`, `degraded`, and `unavailable`. It contains no raw journal or token.
+
+## Firewall and bans / Firewall и bans
+
+`BansSnapshot` содержит время, текущие jails/counts/IP, partial и ограниченные сведения о logtarget/loglevel. Неизвестный count представлен null. `FirewallHealth` содержит здоровье двух независимых readers и выбранный backend. `SourceHealth` обобщает прежний `SshHealth`, чей JSON-формат сохраняется; Rust/TypeScript alias остаётся доступным. Новые action/result и `bans.read` добавляются в pre-release wire version "1". [Границы доступа и runtime](firewall.md).
+
+`BansSnapshot` contains time, current jails/counts/IPs, partial, and bounded logtarget/loglevel metadata. An unknown count is null. `FirewallHealth` contains two independent reader states and the selected backend. `SourceHealth` generalizes `SshHealth` while preserving its JSON shape and Rust/TypeScript alias. New action/result and `bans.read` extend pre-release wire version "1". See [access and runtime boundaries](firewall.md).

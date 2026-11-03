@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HelperResponse",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "snapshot": {
+          "$ref": "#/$defs/BansSnapshot"
+        },
+        "type": {
+          "type": "string",
+          "const": "snapshot"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "snapshot"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "reason_key": {
+          "$ref": "#/$defs/Id"
+        },
+        "type": {
+          "type": "string",
+          "const": "unavailable"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "reason_key"
+      ]
+    }
+  ],
+  "$defs": {
+    "BansSnapshot": {
+      "type": "object",
+      "properties": {
+        "jails": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/JailBans"
+          }
+        },
+        "log_level": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "log_target": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "partial": {
+          "type": "boolean"
+        },
+        "version": {
+          "$ref": "#/$defs/WireVersion"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "observed_at",
+        "jails",
+        "partial"
+      ]
+    },
+    "Id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "JailBans": {
+      "type": "object",
+      "properties": {
+        "addresses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "current_banned": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "jail": {
+          "$ref": "#/$defs/Id"
+        },
+        "reason_key": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "jail",
+        "addresses"
+      ]
+    },
+    "WireVersion": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    }
+  }
+}

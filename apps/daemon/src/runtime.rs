@@ -244,7 +244,17 @@ pub async fn serve(config: Config) -> Result<()> {
         }
     };
     let mut collector = crate::ssh::Collector::new(config.clone(), database.clone());
-    tokio::try_join!(collector.run(), async {
+    let mut fail2ban = crate::ingest::Collector::for_source(
+        crate::ingest::Kind::Fail2ban,
+        config.clone(),
+        database.clone(),
+    );
+    let mut firewall = crate::ingest::Collector::for_source(
+        crate::ingest::Kind::Firewall,
+        config.clone(),
+        database.clone(),
+    );
+    tokio::try_join!(collector.run(), fail2ban.run(), firewall.run(), async {
         let mut delay = 1u64;
         let identity = loop {
             match transport.identity().await {

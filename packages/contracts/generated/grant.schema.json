@@ -31,6 +31,7 @@
       "type": "string",
       "enum": [
         "status.read",
+        "bans.read",
         "events.read",
         "incidents.read"
       ]

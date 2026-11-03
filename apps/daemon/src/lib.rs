@@ -6,7 +6,9 @@ use serde_json::Value;
 use std::{fs, future::Future, path::PathBuf};
 
 pub mod delivery;
+pub mod firewall;
 pub mod host;
+pub mod ingest;
 pub mod runtime;
 pub mod ssh;
 pub mod telegram;
@@ -140,6 +142,17 @@ impl Bot {
         source: &impl StatusSource,
         username: &str,
     ) -> Result<i64> {
+        self.process_update_with_bans(database, update, source, &firewall::HelperClient, username)
+            .await
+    }
+    pub async fn process_update_with_bans(
+        &mut self,
+        database: &runtime::Database,
+        update: &Value,
+        source: &impl StatusSource,
+        bans: &impl firewall::BansSource,
+        username: &str,
+    ) -> Result<i64> {
         let id = update["update_id"]
             .as_i64()
             .filter(|id| (0..i64::MAX).contains(id))
@@ -168,6 +181,31 @@ impl Bot {
             Some(Reply {
                 chat_id: self.config.owner()?.into(),
                 text: render_ssh(&health, &self.locale),
+            })
+        } else if let Some(("/bans", args)) = self.command(update, username) {
+            let text = match firewall::bans_args(&args) {
+                Ok((jail, page)) => match bans.snapshot().await {
+                    Ok(snapshot) => firewall::render_bans(&snapshot, jail, page, &self.locale),
+                    Err(code) => format!(
+                        "{}\n{}",
+                        message(&self.locale, "bans_unavailable"),
+                        isolate(code)
+                    ),
+                },
+                Err(_) => message(&self.locale, "bans_usage").into(),
+            };
+            let config = self.config.clone();
+            let health = database
+                .call(move |store| store.firewall_health(&config, runtime::now()))
+                .await?;
+            let text = format!(
+                "{}\n\n{}",
+                text,
+                firewall::render_health(&health, &self.locale)
+            );
+            Some(Reply {
+                chat_id: self.config.owner()?.into(),
+                text,
             })
         } else {
             match self.handle(update, source, username).await {
@@ -359,7 +397,10 @@ fn render_status(result: &OperationResult, locale: &str) -> String {
         server_id,
         product_version,
         snapshot: s,
-    } = result;
+    } = result
+    else {
+        return message(locale, "operation_failed").into();
+    };
     let mut lines = vec![
         format!(
             "{}: {}",

@@ -2,7 +2,7 @@
 
 ## Русский
 
-Сервис обслуживает один Linux VPS и отдельный Telegram bot token через HTTPS polling. В личном чате владельцу доступны `/start`, `/help`, `/status`, `/delivery` и `/language`. Неизвестные пользователи, группы, callbacks и edited messages не получают состояние. Первичная привязка выполняется локально; username и статус администратора группы не дают доступа.
+Сервис обслуживает один Linux VPS и отдельный Telegram bot token через HTTPS polling. В личном чате владельцу доступны `/start`, `/help`, `/status`, `/delivery`, `/ssh`, `/bans` и `/language`. Неизвестные пользователи, группы, callbacks и edited messages не получают состояние. Первичная привязка выполняется локально; username и статус администратора группы не дают доступа.
 
 ### Подготовка
 
@@ -62,11 +62,11 @@ sudo systemctl restart want-garde.service
 
 Сетевые ошибки polling повторяются с backoff 1..30 s с учётом Telegram retry_after. Ошибки токена, webhook и конфликт polling останавливают процесс. События, ответы и polling offset сохраняются в SQLite до отправки. Неоднозначная отправка может повториться с тем же ID. Срок доставки события: 24 часа; ответа: 10 минут. См. [доставку, диагностику и ограничения](delivery.md).
 
-Для отката первой неуспешной установки остановите и отключите только `want-garde.service`; сохраните конфигурацию и токен для исправления. При последующих ручных обновлениях сначала сохраните предыдущий SHA и файлы, остановите сервис, переключите `current` на проверенную сборку и проверьте запуск. Совместимость будущих данных и автоматический rollback требуют отдельных тикетов. Не запускайте helper или MCP: в #3 они остаются каркасом.
+Для отката первой неуспешной установки остановите и отключите только `want-garde.service`; сохраните конфигурацию и токен для исправления. При последующих ручных обновлениях сначала сохраните предыдущий SHA и файлы, остановите сервис, переключите `current` на проверенную сборку и проверьте запуск. Совместимость будущих данных и автоматический rollback требуют отдельных тикетов. Read helper устанавливается отдельно по [инструкции firewall/fail2ban](firewall.md); MCP остаётся каркасом.
 
 ## English
 
-The service runs on one Linux VPS with a dedicated Telegram bot token and HTTPS polling. The owner can use `/start`, `/help`, `/status`, `/delivery`, and `/language` in a private chat. Unknown users, groups, callbacks, and edited messages receive no host status. Initial binding is local; usernames and group-administrator status grant no access.
+The service runs on one Linux VPS with a dedicated Telegram bot token and HTTPS polling. The owner can use `/start`, `/help`, `/status`, `/delivery`, `/ssh`, `/bans`, and `/language` in a private chat. Unknown users, groups, callbacks, and edited messages receive no host status. Initial binding is local; usernames and group-administrator status grant no access.
 
 ### Preparation
 
@@ -88,10 +88,14 @@ The daemon has no root, capabilities, sudo, or Docker-socket access. Configurati
 
 Polling network failures use a 1..30-second backoff and respect Telegram retry_after. Invalid tokens, webhooks, and polling conflicts stop the process. Events, replies, and polling progress are persisted in SQLite before sending. An ambiguous send can repeat with the same ID. Events expire after 24 hours; replies after 10 minutes. See [delivery, diagnostics, and limitations](delivery.md).
 
-To roll back a failed first installation, stop and disable only `want-garde.service`, retaining configuration and token for correction. Before later manual updates, preserve the previous SHA/files, stop the service, switch `current` to a verified build, and check startup. Future data compatibility and automatic rollback require their implementation issues. Helper and MCP remain scaffolds in #3.
+To roll back a failed first installation, stop and disable only `want-garde.service`, retaining configuration and token for correction. Before later manual updates, preserve the previous SHA/files, stop the service, switch `current` to a verified build, and check startup. Future data compatibility and automatic rollback require their implementation issues. Install the read helper separately using the [firewall/fail2ban instructions](firewall.md); MCP remains a scaffold.
 
 ## SSH
 
 Служба получает чтение системного journal через `SupplementaryGroups=systemd-journal`; это доступ ко всем системным журналам. Первый запуск принимает только новые записи. Режимы, восстановление и `/ssh` описаны в [мониторинге SSH](ssh.md).
 
 The service reads the system journal through `SupplementaryGroups=systemd-journal`, granting access to all system journals. The first run starts with new records. See [SSH monitoring](ssh.md) for modes, recovery, and `/ssh`.
+
+## Firewall / Firewall
+
+Сбор, live `/bans`, права adm и read helper описаны в [firewall/fail2ban](firewall.md). / See [firewall/fail2ban](firewall.md) for collection, live `/bans`, adm access and the read helper.
