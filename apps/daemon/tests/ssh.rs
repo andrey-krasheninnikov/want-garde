@@ -446,6 +446,63 @@ async fn failed_checkpoint_commit_keeps_the_record_available_for_retry() {
 }
 
 #[tokio::test]
+async fn repeated_failed_registration_does_not_keep_removed_log_files_open() {
+    use std::os::unix::fs::MetadataExt;
+    let dir = tempfile::tempdir().unwrap();
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let log = dir.path().join("auth.log");
+    fs::write(&log, "").unwrap();
+    let config = Config {
+        server_id: Id::new("server-demo").unwrap(),
+        owner_user_id: Some("123456789".into()),
+        bot_token_file: dir.path().join("token"),
+        state_dir: dir.path().into(),
+        default_locale: "en".into(),
+        ssh: SshConfig::File { path: log.clone() },
+    };
+    let database = Database::open(config.clone()).await.unwrap();
+    let mut collector = Collector::new(config, database.clone());
+    collector.scan().await.unwrap();
+    fs::rename(&log, dir.path().join("auth.log.1")).unwrap();
+    let fault = rusqlite::Connection::open(dir.path().join("garde.sqlite3")).unwrap();
+    fault.execute_batch("CREATE TRIGGER checkpoint_failure BEFORE UPDATE ON meta WHEN NEW.key='ssh.state' BEGIN SELECT RAISE(ABORT,'test failure'); END;").unwrap();
+    let mut identities = std::collections::BTreeSet::new();
+    for _ in 0..24 {
+        fs::write(&log, "").unwrap();
+        let m = fs::metadata(&log).unwrap();
+        identities.insert((m.dev(), m.ino()));
+        assert!(collector.scan().await.is_err());
+        fs::remove_file(&log).unwrap();
+    }
+    #[cfg(target_os = "macos")]
+    let retained = {
+        let output = std::process::Command::new("/usr/sbin/lsof")
+            .args(["-a", "-p", &std::process::id().to_string(), "-F", "i"])
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        String::from_utf8(output.stdout)
+            .unwrap()
+            .lines()
+            .filter_map(|line| line.strip_prefix('i')?.parse::<u64>().ok())
+            .filter(|inode| identities.iter().any(|(_, own)| own == inode))
+            .count()
+    };
+    #[cfg(not(target_os = "macos"))]
+    let retained = fs::read_dir("/dev/fd")
+        .unwrap()
+        .filter_map(|entry| {
+            let m = fs::metadata(entry.ok()?.path()).ok()?;
+            identities.contains(&(m.dev(), m.ino())).then_some(())
+        })
+        .count();
+    assert!(
+        (1..=4).contains(&retained),
+        "retained {retained} removed log files"
+    );
+}
+
+#[tokio::test]
 async fn an_unavailable_rotated_file_produces_a_persistent_gap_and_new_events_continue() {
     let dir = tempfile::tempdir().unwrap();
     fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();

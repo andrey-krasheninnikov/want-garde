@@ -164,6 +164,8 @@ impl<J: JournalSource> Collector<J> {
     }
     pub async fn scan(&mut self) -> Result<()> {
         let mut state = self.load().await?;
+        self.handles
+            .retain(|identity, _| state.files.iter().any(|f| (f.device, f.inode) == *identity));
         if state.config != self.config.ssh {
             state.config = self.config.ssh.clone();
             state.source = None;
