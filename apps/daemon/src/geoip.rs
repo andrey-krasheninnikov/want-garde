@@ -1,5 +1,5 @@
 use crate::{
-    delivery::{Store, sql},
+    delivery::{Delivery, Store, sql},
     runtime::Database,
 };
 use garde_config::{Config, Result};
@@ -64,7 +64,8 @@ pub(crate) fn initialize(connection: &Connection) -> Result<()> {
     sql(connection.execute_batch("CREATE TABLE IF NOT EXISTS geoip_context(event_id TEXT PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE, ip TEXT, payload TEXT NOT NULL);
         CREATE INDEX IF NOT EXISTS geoip_context_ip ON geoip_context(ip);
         CREATE TABLE IF NOT EXISTS geoip_cache(ip TEXT PRIMARY KEY, payload TEXT NOT NULL, expires_at INTEGER NOT NULL, last_used INTEGER NOT NULL);
-        CREATE TABLE IF NOT EXISTS geoip_pending(ip TEXT PRIMARY KEY, created_at INTEGER NOT NULL, attempted INTEGER NOT NULL DEFAULT 0);"))?;
+        CREATE TABLE IF NOT EXISTS geoip_pending(ip TEXT PRIMARY KEY, created_at INTEGER NOT NULL, attempted INTEGER NOT NULL DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS geoip_deliveries(delivery_id INTEGER PRIMARY KEY REFERENCES deliveries(id) ON DELETE CASCADE, locale TEXT NOT NULL, body TEXT NOT NULL);"))?;
     sql(connection.execute(
         "INSERT OR IGNORE INTO meta VALUES('geoip.budget',?1)",
         [encode(&Budget::default())?],
@@ -73,6 +74,7 @@ pub(crate) fn initialize(connection: &Connection) -> Result<()> {
         "SELECT event_id,ip,payload FROM geoip_context LIMIT 0",
         "SELECT ip,payload,expires_at,last_used FROM geoip_cache LIMIT 0",
         "SELECT ip,created_at,attempted FROM geoip_pending LIMIT 0",
+        "SELECT delivery_id,locale,body FROM geoip_deliveries LIMIT 0",
     ] {
         sql(connection.prepare(query))?;
     }
@@ -236,6 +238,24 @@ fn valid_details(details: &GeoIpDetails) -> bool {
 }
 
 impl Store {
+    pub fn geoip_reference(&self, reference: &str) -> Result<EventGeoIp> {
+        match self.geoip_event(reference) {
+            Err("geoip.not_found") => {}
+            result => return result,
+        }
+        let delivery = reference
+            .strip_prefix("d-")
+            .and_then(|id| id.parse::<i64>().ok())
+            .filter(|id| *id > 0)
+            .ok_or("geoip.not_found")?;
+        let value: Option<String> = sql(self.connection.query_row(
+            "SELECT g.payload FROM deliveries d JOIN geoip_context g ON g.event_id=d.event_id WHERE d.id=?1 AND d.chat_id=(SELECT value FROM meta WHERE key='owner')",
+            [delivery],
+            |r| r.get(0),
+        ).optional())?;
+        decode(&value.ok_or("geoip.not_found")?)
+    }
+
     pub fn geoip_event(&self, event_id: &str) -> Result<EventGeoIp> {
         Id::new(event_id)?;
         let value: Option<String> = sql(self
@@ -407,6 +427,10 @@ fn resolve(
         sql(connection.execute(
             "UPDATE geoip_context SET payload=?2 WHERE event_id=?1",
             params![event_id, encode(&context)?],
+        ))?;
+        sql(connection.execute(
+            "UPDATE deliveries SET next_at=min(next_at,?2) WHERE event_id=?1 AND state='pending' AND attempts=0 AND id IN (SELECT delivery_id FROM geoip_deliveries)",
+            params![event_id, now],
         ))?;
     }
     sql(connection.execute("DELETE FROM geoip_cache WHERE expires_at<=?1", [now]))?;
@@ -591,6 +615,42 @@ impl Provider for IpInfo {
         Ok(details)
     }
 }
+pub(crate) fn render_notification(body: &str, context: &EventGeoIp, locale: &str) -> String {
+    format!(
+        "{body}\n{}\n/geoip {}",
+        render_context(context, locale),
+        context.event_id.as_str()
+    )
+}
+
+pub(crate) fn prepare_delivery(connection: &Connection, delivery: &mut Delivery) -> Result<()> {
+    let saved: Option<(String, String, String)> = sql(connection.query_row(
+        "SELECT w.locale,w.body,g.payload FROM geoip_deliveries w JOIN deliveries d ON d.id=w.delivery_id JOIN geoip_context g ON g.event_id=d.event_id WHERE w.delivery_id=?1 AND d.attempts=0",
+        [delivery.id],
+        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+    ).optional())?;
+    if let Some((locale, body, payload)) = saved {
+        let context: EventGeoIp = decode(&payload)?;
+        let text = crate::delivery::delivery_text(
+            &render_notification(&body, &context, &locale),
+            Some(context.event_id.as_str()),
+            delivery.id,
+        );
+        if text.encode_utf16().count() <= 4096 {
+            sql(connection.execute(
+                "UPDATE deliveries SET text=?2 WHERE id=?1",
+                params![delivery.id, text],
+            ))?;
+            delivery.reply.text = text;
+        }
+    }
+    sql(connection.execute(
+        "DELETE FROM geoip_deliveries WHERE delivery_id=?1",
+        [delivery.id],
+    ))?;
+    Ok(())
+}
+
 pub fn render_context(context: &EventGeoIp, locale: &str) -> String {
     let state = match context.state {
         GeoIpState::Missing => context.reason_key.as_str(),

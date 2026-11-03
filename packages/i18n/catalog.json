@@ -10,7 +10,7 @@
       "language": "Язык",
       "owner_bound": "Владелец привязан.",
       "operation_failed": "Операция не выполнена.",
-      "help_commands": "Команды: /status, /delivery, /ssh, /bans, /services, /ports, /xui, /geoip [EVENT_ID], /language. Состояние сервера доступно только владельцу в личных сообщениях.",
+      "help_commands": "Команды: /status, /delivery, /ssh, /bans, /services, /ports, /xui, /geoip [EVENT_ID|d-DELIVERY_ID], /language. Состояние сервера доступно только владельцу в личных сообщениях.",
       "language_saved": "Язык сохранён.",
       "language_choose": "Выберите язык:",
       "metric_unavailable": "Недоступно",
@@ -205,7 +205,7 @@
       "geoip_skipped": "Пропущено запрос",
       "geoip_cooldown": "Повтор после",
       "geoip_not_found": "Для этого события нет сохранённого GeoIP-контекста.",
-      "geoip_usage": "/geoip или /geoip EVENT_ID"
+      "geoip_usage": "/geoip или /geoip EVENT_ID|d-DELIVERY_ID"
     },
     "en": {
       "nativeName": "English",
@@ -216,7 +216,7 @@
       "language": "Language",
       "owner_bound": "Owner bound.",
       "operation_failed": "Operation failed.",
-      "help_commands": "Commands: /status, /delivery, /ssh, /bans, /services, /ports, /xui, /geoip [EVENT_ID], /language. Host status is available only to the owner in private messages.",
+      "help_commands": "Commands: /status, /delivery, /ssh, /bans, /services, /ports, /xui, /geoip [EVENT_ID|d-DELIVERY_ID], /language. Host status is available only to the owner in private messages.",
       "language_saved": "Language saved.",
       "language_choose": "Choose a language:",
       "metric_unavailable": "Unavailable",
@@ -411,7 +411,7 @@
       "geoip_skipped": "Skipped lookups",
       "geoip_cooldown": "Retry after",
       "geoip_not_found": "No saved GeoIP context for this event.",
-      "geoip_usage": "/geoip or /geoip EVENT_ID"
+      "geoip_usage": "/geoip or /geoip EVENT_ID|d-DELIVERY_ID"
     },
     "zh-Hans": {
       "nativeName": "简体中文",
@@ -617,7 +617,7 @@
       "geoip_skipped": "跳过的查询",
       "geoip_cooldown": "重试时间",
       "geoip_not_found": "此事件没有保存的 GeoIP 信息。",
-      "geoip_usage": "/geoip 或 /geoip EVENT_ID"
+      "geoip_usage": "/geoip 或 /geoip EVENT_ID|d-DELIVERY_ID"
     },
     "es": {
       "nativeName": "Español",
@@ -628,7 +628,7 @@
       "language": "Idioma",
       "owner_bound": "Propietario vinculado.",
       "operation_failed": "La operación falló.",
-      "help_commands": "Comandos: /status, /delivery, /ssh, /bans, /services, /ports, /xui, /geoip [EVENT_ID], /language. El estado solo está disponible para el propietario en mensajes privados.",
+      "help_commands": "Comandos: /status, /delivery, /ssh, /bans, /services, /ports, /xui, /geoip [EVENT_ID|d-DELIVERY_ID], /language. El estado solo está disponible para el propietario en mensajes privados.",
       "language_saved": "Idioma guardado.",
       "language_choose": "Elige un idioma:",
       "metric_unavailable": "No disponible",
@@ -823,7 +823,7 @@
       "geoip_skipped": "Consultas omitidas",
       "geoip_cooldown": "Reintentar después de",
       "geoip_not_found": "No hay contexto GeoIP guardado para este evento.",
-      "geoip_usage": "/geoip o /geoip EVENT_ID"
+      "geoip_usage": "/geoip o /geoip EVENT_ID|d-DELIVERY_ID"
     },
     "pt-BR": {
       "nativeName": "Português (Brasil)",
@@ -834,7 +834,7 @@
       "language": "Idioma",
       "owner_bound": "Proprietário vinculado.",
       "operation_failed": "A operação falhou.",
-      "help_commands": "Comandos: /status, /delivery, /ssh, /bans, /services, /ports, /xui, /geoip [EVENT_ID], /language. O estado está disponível apenas ao proprietário em mensagens privadas.",
+      "help_commands": "Comandos: /status, /delivery, /ssh, /bans, /services, /ports, /xui, /geoip [EVENT_ID|d-DELIVERY_ID], /language. O estado está disponível apenas ao proprietário em mensagens privadas.",
       "language_saved": "Idioma salvo.",
       "language_choose": "Escolha um idioma:",
       "metric_unavailable": "Indisponível",
@@ -1029,7 +1029,7 @@
       "geoip_skipped": "Consultas ignoradas",
       "geoip_cooldown": "Tentar após",
       "geoip_not_found": "Não há contexto GeoIP salvo para este evento.",
-      "geoip_usage": "/geoip ou /geoip EVENT_ID"
+      "geoip_usage": "/geoip ou /geoip EVENT_ID|d-DELIVERY_ID"
     },
     "hi": {
       "nativeName": "हिन्दी",
@@ -1040,7 +1040,7 @@
       "language": "भाषा",
       "owner_bound": "स्वामी लिंक हो गया।",
       "operation_failed": "कार्रवाई विफल हुई।",
-      "help_commands": "कमांड: /status, /delivery, /ssh, /bans, /services, /ports, /xui, /geoip [EVENT_ID], /language। सर्वर की स्थिति केवल स्वामी को निजी संदेशों में मिलती है।",
+      "help_commands": "कमांड: /status, /delivery, /ssh, /bans, /services, /ports, /xui, /geoip [EVENT_ID|d-DELIVERY_ID], /language। सर्वर की स्थिति केवल स्वामी को निजी संदेशों में मिलती है।",
       "language_saved": "भाषा सहेजी गई।",
       "language_choose": "भाषा चुनें:",
       "metric_unavailable": "उपलब्ध नहीं",
@@ -1235,7 +1235,7 @@
       "geoip_skipped": "छोड़ी गई खोज",
       "geoip_cooldown": "इसके बाद पुनः प्रयास",
       "geoip_not_found": "इस घटना के लिए सहेजा गया GeoIP संदर्भ नहीं है।",
-      "geoip_usage": "/geoip या /geoip EVENT_ID"
+      "geoip_usage": "/geoip या /geoip EVENT_ID|d-DELIVERY_ID"
     },
     "ja": {
       "nativeName": "日本語",
@@ -1441,7 +1441,7 @@
       "geoip_skipped": "省略された検索",
       "geoip_cooldown": "再試行日時",
       "geoip_not_found": "このイベントの GeoIP 情報は保存されていません。",
-      "geoip_usage": "/geoip または /geoip EVENT_ID"
+      "geoip_usage": "/geoip または /geoip EVENT_ID|d-DELIVERY_ID"
     },
     "ar": {
       "nativeName": "العربية",
@@ -1647,7 +1647,7 @@
       "geoip_skipped": "استعلامات متجاوزة",
       "geoip_cooldown": "إعادة المحاولة بعد",
       "geoip_not_found": "لا يوجد سياق GeoIP محفوظ لهذا الحدث.",
-      "geoip_usage": "⁨/geoip⁩ أو ⁨/geoip EVENT_ID⁩"
+      "geoip_usage": "⁨/geoip⁩ أو ⁨/geoip EVENT_ID|d-DELIVERY_ID⁩"
     },
     "he": {
       "nativeName": "עברית",
@@ -1658,7 +1658,7 @@
       "language": "שפה",
       "owner_bound": "הבעלים קושר.",
       "operation_failed": "הפעולה נכשלה.",
-      "help_commands": "פקודות: /status, /delivery, /ssh, /bans, /services, /ports, /xui, /geoip [EVENT_ID], /language. מצב השרת זמין רק לבעלים בהודעות פרטיות.",
+      "help_commands": "פקודות: /status, /delivery, /ssh, /bans, /services, /ports, /xui, /geoip [EVENT_ID|d-DELIVERY_ID], /language. מצב השרת זמין רק לבעלים בהודעות פרטיות.",
       "language_saved": "השפה נשמרה.",
       "language_choose": "בחרו שפה:",
       "metric_unavailable": "לא זמין",
@@ -1853,7 +1853,7 @@
       "geoip_skipped": "חיפושים שדולגו",
       "geoip_cooldown": "ניסיון חוזר אחרי",
       "geoip_not_found": "אין הקשר GeoIP שמור לאירוע זה.",
-      "geoip_usage": "⁨/geoip⁩ או ⁨/geoip EVENT_ID⁩"
+      "geoip_usage": "⁨/geoip⁩ או ⁨/geoip EVENT_ID|d-DELIVERY_ID⁩"
     },
     "tr": {
       "nativeName": "Türkçe",
@@ -1864,7 +1864,7 @@
       "language": "Dil",
       "owner_bound": "Sahip bağlandı.",
       "operation_failed": "İşlem başarısız oldu.",
-      "help_commands": "Komutlar: /status, /delivery, /ssh, /bans, /services, /ports, /xui, /geoip [EVENT_ID], /language. Sunucu durumu yalnızca sahibine özel mesajlarda gösterilir.",
+      "help_commands": "Komutlar: /status, /delivery, /ssh, /bans, /services, /ports, /xui, /geoip [EVENT_ID|d-DELIVERY_ID], /language. Sunucu durumu yalnızca sahibine özel mesajlarda gösterilir.",
       "language_saved": "Dil kaydedildi.",
       "language_choose": "Bir dil seçin:",
       "metric_unavailable": "Kullanılamıyor",
@@ -2059,7 +2059,7 @@
       "geoip_skipped": "Atlanan sorgular",
       "geoip_cooldown": "Yeniden deneme zamanı",
       "geoip_not_found": "Bu olay için kayıtlı GeoIP bilgisi yok.",
-      "geoip_usage": "/geoip veya /geoip EVENT_ID"
+      "geoip_usage": "/geoip veya /geoip EVENT_ID|d-DELIVERY_ID"
     },
     "fr": {
       "nativeName": "Français",
@@ -2070,7 +2070,7 @@
       "language": "Langue",
       "owner_bound": "Propriétaire associé.",
       "operation_failed": "L’opération a échoué.",
-      "help_commands": "Commandes : /status, /delivery, /ssh, /bans, /services, /ports, /xui, /geoip [EVENT_ID], /language. L’état du serveur est réservé au propriétaire en message privé.",
+      "help_commands": "Commandes : /status, /delivery, /ssh, /bans, /services, /ports, /xui, /geoip [EVENT_ID|d-DELIVERY_ID], /language. L’état du serveur est réservé au propriétaire en message privé.",
       "language_saved": "Langue enregistrée.",
       "language_choose": "Choisissez une langue :",
       "metric_unavailable": "Indisponible",
@@ -2265,7 +2265,7 @@
       "geoip_skipped": "Recherches ignorées",
       "geoip_cooldown": "Réessayer après",
       "geoip_not_found": "Aucun contexte GeoIP enregistré pour cet événement.",
-      "geoip_usage": "/geoip ou /geoip EVENT_ID"
+      "geoip_usage": "/geoip ou /geoip EVENT_ID|d-DELIVERY_ID"
     },
     "de": {
       "nativeName": "Deutsch",
@@ -2276,7 +2276,7 @@
       "language": "Sprache",
       "owner_bound": "Eigentümer verknüpft.",
       "operation_failed": "Vorgang fehlgeschlagen.",
-      "help_commands": "Befehle: /status, /delivery, /ssh, /bans, /services, /ports, /xui, /geoip [EVENT_ID], /language. Der Serverstatus ist nur für den Eigentümer in privaten Nachrichten verfügbar.",
+      "help_commands": "Befehle: /status, /delivery, /ssh, /bans, /services, /ports, /xui, /geoip [EVENT_ID|d-DELIVERY_ID], /language. Der Serverstatus ist nur für den Eigentümer in privaten Nachrichten verfügbar.",
       "language_saved": "Sprache gespeichert.",
       "language_choose": "Sprache auswählen:",
       "metric_unavailable": "Nicht verfügbar",
@@ -2471,7 +2471,7 @@
       "geoip_skipped": "Übersprungene Abfragen",
       "geoip_cooldown": "Erneuter Versuch nach",
       "geoip_not_found": "Für dieses Ereignis ist kein GeoIP-Kontext gespeichert.",
-      "geoip_usage": "/geoip oder /geoip EVENT_ID"
+      "geoip_usage": "/geoip oder /geoip EVENT_ID|d-DELIVERY_ID"
     }
   }
 }

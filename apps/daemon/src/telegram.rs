@@ -187,7 +187,7 @@ impl Transport for Telegram {
         let result = self
             .call(
                 "sendMessage",
-                json!({"chat_id":reply.chat_id,"text":reply.text,"protect_content":true}),
+                json!({"chat_id":reply.chat_id,"text":reply.text,"entities":[{"type":"pre","offset":0,"length":reply.text.trim_end().encode_utf16().count()}],"protect_content":false}),
             )
             .await?;
         if result["message_id"].as_i64().is_none()
@@ -286,7 +286,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn sends_plain_unicode_without_formatting_and_polls_only_messages() {
+    async fn sends_copyable_monospace_unicode_without_parsing_markup_and_polls_only_messages() {
         let (api, worker) = server(vec![
             (
                 200,
@@ -307,16 +307,20 @@ mod tests {
         api.send(&Reply {
             locale: None,
             chat_id: "123456789".into(),
-            text: "שלום <host> مرحبا".into(),
+            text: "שלום <host> مرحبا 🛡".into(),
         })
         .await
         .unwrap();
         let observed = worker.join().unwrap();
         assert_eq!(observed[2].1["allowed_updates"], json!(["message"]));
         assert_eq!(observed[2].1["offset"], 42);
-        assert_eq!(observed[3].1["text"], "שלום <host> مرحبا");
+        assert_eq!(observed[3].1["text"], "שלום <host> مرحبا 🛡");
         assert!(observed[3].1.get("parse_mode").is_none());
-        assert_eq!(observed[3].1["protect_content"], true);
+        assert_eq!(
+            observed[3].1["entities"],
+            json!([{"type":"pre","offset":0,"length":20}])
+        );
+        assert_ne!(observed[3].1["protect_content"], true);
     }
 
     #[tokio::test]

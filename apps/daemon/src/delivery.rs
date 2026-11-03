@@ -622,8 +622,9 @@ impl Store {
         self.maintenance(now)?;
         let transaction = sql(self.connection.transaction())?;
         sql(transaction.execute("UPDATE deliveries SET state='dead_letter',last_error=CASE WHEN expires_at<=?1 THEN 'delivery.expired' ELSE 'delivery.exhausted' END,updated_at=?1 WHERE id IN (SELECT id FROM deliveries WHERE state='pending' AND (expires_at<=?1 OR attempts>=128) LIMIT 100)",[now]))?;
-        let value = sql(transaction.query_row("SELECT id,chat_id,text,attempts FROM deliveries d WHERE state='pending' AND next_at<=?1 AND expires_at>?1 AND attempts<128 AND NOT EXISTS(SELECT 1 FROM deliveries a WHERE a.chat_id=d.chat_id AND a.state='in_flight') AND NOT EXISTS(SELECT 1 FROM cooldowns c WHERE c.chat_id=d.chat_id AND c.until_at>?1) ORDER BY next_at,id LIMIT 1",[now],|r| Ok(Delivery { id:r.get(0)?, reply:Reply { locale: None, chat_id:r.get(1)?, text:r.get(2)? },attempts:r.get::<_,u32>(3)?+1 })).optional())?;
-        if let Some(value) = &value {
+        let mut value = sql(transaction.query_row("SELECT id,chat_id,text,attempts FROM deliveries d WHERE state='pending' AND next_at<=?1 AND expires_at>?1 AND attempts<128 AND NOT EXISTS(SELECT 1 FROM deliveries a WHERE a.chat_id=d.chat_id AND a.state='in_flight') AND NOT EXISTS(SELECT 1 FROM cooldowns c WHERE c.chat_id=d.chat_id AND c.until_at>?1) ORDER BY next_at,id LIMIT 1",[now],|r| Ok(Delivery { id:r.get(0)?, reply:Reply { locale: None, chat_id:r.get(1)?, text:r.get(2)? },attempts:r.get::<_,u32>(3)?+1 })).optional())?;
+        if let Some(value) = &mut value {
+            crate::geoip::prepare_delivery(&transaction, value)?;
             sql(transaction.execute("UPDATE deliveries SET state='in_flight',attempts=attempts+1,updated_at=?1,next_at=?3 WHERE id=?2",params![now,value.id,now.saturating_add(backoff(value.attempts) as i64)]))?;
         }
         sql(transaction.commit())?;
@@ -942,21 +943,18 @@ fn enqueue_event(
 ) -> Result<()> {
     let context = crate::geoip::record(transaction, event, config, now)?;
     for reply in replies {
+        let body = &reply.text;
+        let locale = reply
+            .locale
+            .as_deref()
+            .or_else(|| config.map(|c| c.default_locale.as_str()))
+            .unwrap_or("en");
         let enriched;
         let reply = if let Some(context) = &context {
-            let locale = reply
-                .locale
-                .as_deref()
-                .or_else(|| config.map(|c| c.default_locale.as_str()))
-                .unwrap_or("en");
             enriched = Reply {
                 locale: None,
                 chat_id: reply.chat_id.clone(),
-                text: format!(
-                    "{}\n{}",
-                    reply.text,
-                    crate::geoip::render_context(context, locale)
-                ),
+                text: crate::geoip::render_notification(body, context, locale),
             };
             &enriched
         } else {
@@ -970,6 +968,21 @@ fn enqueue_event(
             now,
             86400,
         )?;
+        if context
+            .as_ref()
+            .is_some_and(|c| c.reason_key.as_str() == "geoip_pending")
+        {
+            let id = transaction.last_insert_rowid();
+            sql(transaction.execute(
+                "INSERT INTO geoip_deliveries VALUES(?1,?2,?3)",
+                params![id, locale, body],
+            ))?;
+            // Reserve one second of the ten-second budget for sender scheduling.
+            sql(transaction.execute(
+                "UPDATE deliveries SET next_at=?2 WHERE id=?1",
+                params![id, now.saturating_add(9)],
+            ))?;
+        }
     }
     Ok(())
 }
@@ -991,15 +1004,19 @@ fn enqueue(
     let expires = now.checked_add(ttl).ok_or("delivery.invalid")?;
     sql(transaction.execute("INSERT INTO deliveries(event_id,request_id,chat_id,text,next_at,created_at,updated_at,expires_at) VALUES(?1,?2,?3,?4,?5,?5,?5,?6)",params![event,request,reply.chat_id,reply.text,now,expires]))?;
     let id = transaction.last_insert_rowid();
-    let text = match event {
-        Some(event) => format!("{}\nEvent: {event}\nID: d-{id}", reply.text),
-        None => format!("{}\nID: d-{id}", reply.text),
-    };
+    let text = delivery_text(&reply.text, event, id);
     sql(transaction.execute(
         "UPDATE deliveries SET text=?1 WHERE id=?2",
         params![text, id],
     ))?;
     Ok(())
+}
+
+pub(crate) fn delivery_text(text: &str, event: Option<&str>, id: i64) -> String {
+    match event {
+        Some(event) => format!("{text}\nEvent: {event}\nID: d-{id}"),
+        None => format!("{text}\nID: d-{id}"),
+    }
 }
 
 #[cfg(test)]

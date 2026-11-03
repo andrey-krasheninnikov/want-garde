@@ -66,7 +66,7 @@ impl garde_daemon::geoip::Provider for Provider {
     }
 }
 #[tokio::test]
-async fn cold_lookup_is_saved_without_changing_delivery_and_later_events_use_cache() {
+async fn cold_lookup_enriches_the_first_delivery_and_retries_keep_the_same_text() {
     let dir = tempfile::tempdir().unwrap();
     fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
     let mut config = configuration(dir.path());
@@ -77,13 +77,13 @@ async fn cold_lookup_is_saved_without_changing_delivery_and_later_events_use_cac
     bot.publish_event(&database, event("geo-cold", "8.8.8.8"))
         .await
         .unwrap();
-    let delivery = database
-        .call(|s| s.claim(garde_daemon::runtime::now()))
-        .await
-        .unwrap()
-        .unwrap();
-    let original = delivery.reply.text.clone();
-    assert!(original.contains("pending"));
+    assert!(
+        database
+            .call(|s| s.claim(garde_daemon::runtime::now()))
+            .await
+            .unwrap()
+            .is_none()
+    );
     assert!(
         garde_daemon::geoip::run_once(&database, &Provider, garde_daemon::runtime::now())
             .await
@@ -92,6 +92,16 @@ async fn cold_lookup_is_saved_without_changing_delivery_and_later_events_use_cac
     let context = database.call(|s| s.geoip_event("geo-cold")).await.unwrap();
     assert_eq!(context.state, garde_contracts::GeoIpState::Retrieved);
     assert_eq!(context.details.unwrap().country_code.as_deref(), Some("US"));
+    let delivery = database
+        .call(|s| s.claim(garde_daemon::runtime::now()))
+        .await
+        .unwrap()
+        .unwrap();
+    let original = delivery.reply.text.clone();
+    assert!(original.contains("Example network"));
+    assert!(original.contains("AS15169"));
+    assert!(original.contains("/geoip geo-cold"));
+    assert!(!original.contains("lookup pending"));
     let count = database
         .call(|s| s.health(garde_daemon::runtime::now()))
         .await
@@ -119,11 +129,22 @@ async fn cold_lookup_is_saved_without_changing_delivery_and_later_events_use_cac
         .unwrap()
         .unwrap();
     assert_eq!(retry.reply.text, original);
+    database
+        .call(move |s| s.finish(retry.id, garde_daemon::delivery::Outcome::Delivered, at + 5))
+        .await
+        .unwrap();
     bot.publish_event(&database, event("geo-warm", "8.8.8.8"))
         .await
         .unwrap();
     let context = database.call(|s| s.geoip_event("geo-warm")).await.unwrap();
     assert_eq!(context.state, garde_contracts::GeoIpState::Cached);
+    let warm = database
+        .call(|s| s.claim(garde_daemon::runtime::now()))
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(warm.reply.text.contains("GeoIP: cached"));
+    assert!(warm.reply.text.contains("Example network"));
 
     assert!(
         !garde_daemon::geoip::run_once(&database, &Provider, garde_daemon::runtime::now() + 2)
@@ -133,6 +154,65 @@ async fn cold_lookup_is_saved_without_changing_delivery_and_later_events_use_cac
 }
 
 struct Never;
+
+#[tokio::test]
+async fn unresolved_lookup_releases_delivery_within_ten_seconds_and_late_results_do_not_rewrite_it()
+{
+    let dir = tempfile::tempdir().unwrap();
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let mut config = configuration(dir.path());
+    config.geoip.enabled = true;
+    let database = Database::open(config).await.unwrap();
+    let at = garde_daemon::runtime::now();
+    publish_at(&database, "deadline-context".into(), "8.8.8.8".into(), at).await;
+    assert!(
+        database
+            .call(move |s| s.claim(at + 8))
+            .await
+            .unwrap()
+            .is_none()
+    );
+    let delivery = database
+        .call(move |s| s.claim(at + 10))
+        .await
+        .unwrap()
+        .unwrap();
+    let original = delivery.reply.text.clone();
+    assert!(original.contains("lookup pending"));
+    assert!(original.contains("/geoip deadline-context"));
+    garde_daemon::geoip::run_once(&database, &Provider, at + 11)
+        .await
+        .unwrap();
+    database
+        .call(move |s| {
+            s.finish(
+                delivery.id,
+                garde_daemon::delivery::Outcome::Retry {
+                    code: "telegram.network",
+                    retry_after: 0,
+                    uncertain: false,
+                },
+                at + 11,
+            )
+        })
+        .await
+        .unwrap();
+    let retry = database
+        .call(move |s| s.claim(at + 16))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(retry.reply.text, original);
+    assert_eq!(
+        database
+            .call(|s| s.geoip_event("deadline-context"))
+            .await
+            .unwrap()
+            .state,
+        garde_contracts::GeoIpState::Retrieved
+    );
+}
+
 impl garde_daemon::geoip::Provider for Never {
     async fn lookup(
         &self,
@@ -142,7 +222,7 @@ impl garde_daemon::geoip::Provider for Never {
     }
 }
 #[tokio::test]
-async fn critical_delivery_does_not_wait_for_a_hung_lookup_and_private_addresses_stay_local() {
+async fn hung_lookup_does_not_block_collection_or_private_address_filtering() {
     let dir = tempfile::tempdir().unwrap();
     fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
     let mut config = configuration(dir.path());
@@ -243,6 +323,13 @@ async fn restart_retains_budgets_and_interrupted_lookup_does_not_repeat() {
         .await
         .unwrap();
     assert_eq!(context.reason_key.as_str(), "geoip_interrupted");
+    let delivery = database
+        .call(|s| s.claim(garde_daemon::runtime::now()))
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(delivery.reply.text.contains("lookup interrupted"));
+    assert!(delivery.reply.text.contains("/geoip interrupted"));
     let health = database
         .call(|s| s.geoip_health(garde_daemon::runtime::now()))
         .await
@@ -275,14 +362,16 @@ async fn saved_context_and_health_enforce_owner_access_and_follow_saved_language
     let database = Database::open(config).await.unwrap();
     let update = |id, user, kind, text: &str| serde_json::json!({"update_id":id,"message":{"from":{"id":user,"is_bot":false},"chat":{"id":user,"type":kind},"text":text}});
     for (id, user, kind) in [(0, 123456789, "group"), (1, 987654321, "private")] {
-        bot.process_update(
-            &database,
-            &update(id, user, kind, "/geoip"),
-            &Host,
-            "test_bot",
-        )
-        .await
-        .unwrap();
+        for (offset, text) in ["/geoip", "/geoip d-1"].into_iter().enumerate() {
+            bot.process_update(
+                &database,
+                &update(id * 2 + offset, user, kind, text),
+                &Host,
+                "test_bot",
+            )
+            .await
+            .unwrap();
+        }
     }
     assert_eq!(
         database
@@ -295,7 +384,7 @@ async fn saved_context_and_health_enforce_owner_access_and_follow_saved_language
     bot.publish_event(&database, event("saved-context", "8.8.8.8"))
         .await
         .unwrap();
-    let mut id = 2;
+    let mut id = 4;
     for locale in garde_entrypoint::catalog()["locales"]
         .as_object()
         .unwrap()
@@ -346,6 +435,57 @@ async fn saved_context_and_health_enforce_owner_access_and_follow_saved_language
 }
 
 struct Unavailable;
+
+#[tokio::test]
+async fn notification_delivery_id_reads_the_same_context_as_its_event_id() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let mut config = configuration(dir.path());
+    config.geoip.enabled = true;
+    let mut bot = Bot::new(config.clone()).unwrap();
+    let database = Database::open(config).await.unwrap();
+    bot.publish_event(&database, event("copyable-context", "8.8.8.8"))
+        .await
+        .unwrap();
+    garde_daemon::geoip::run_once(&database, &Provider, garde_daemon::runtime::now())
+        .await
+        .unwrap();
+    let notification = database
+        .call(|s| s.claim(garde_daemon::runtime::now()))
+        .await
+        .unwrap()
+        .unwrap();
+    let reference = notification
+        .reply
+        .text
+        .lines()
+        .last()
+        .unwrap()
+        .strip_prefix("ID: ")
+        .unwrap();
+    let update = serde_json::json!({"update_id":0,"message":{"from":{"id":123456789,"is_bot":false},"chat":{"id":123456789,"type":"private"},"text":format!("/geoip {reference}")}});
+    database
+        .call(move |s| {
+            s.finish(
+                notification.id,
+                garde_daemon::delivery::Outcome::Delivered,
+                garde_daemon::runtime::now(),
+            )
+        })
+        .await
+        .unwrap();
+    bot.process_update(&database, &update, &Host, "test_bot")
+        .await
+        .unwrap();
+    let response = database
+        .call(|s| s.claim(garde_daemon::runtime::now()))
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(response.reply.text.contains("copyable-context"));
+    assert!(response.reply.text.contains("Example network"));
+}
+
 impl garde_daemon::geoip::Provider for Unavailable {
     async fn lookup(
         &self,
@@ -618,7 +758,8 @@ async fn local_diagnostics_are_read_only_and_context_follows_event_retention() {
 async fn context_keeps_the_same_locale_as_its_notification_when_preferences_change() {
     let dir = tempfile::tempdir().unwrap();
     fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
-    let config = configuration(dir.path());
+    let mut config = configuration(dir.path());
+    config.geoip.enabled = true;
     let bot = Bot::new(config.clone()).unwrap();
     let database = Database::open(config).await.unwrap();
     garde_config::atomic_write(
@@ -630,13 +771,21 @@ async fn context_keeps_the_same_locale_as_its_notification_when_preferences_chan
     bot.publish_event(&database, event("saved-locale", "8.8.8.8"))
         .await
         .unwrap();
+    garde_daemon::geoip::run_once(&database, &Provider, garde_daemon::runtime::now())
+        .await
+        .unwrap();
     let delivery = database
         .call(|s| s.claim(garde_daemon::runtime::now()))
         .await
         .unwrap()
         .unwrap();
-    assert!(delivery.reply.text.contains("GeoIP: disabled"));
-    assert!(!delivery.reply.text.contains("выключено"));
+    assert!(
+        delivery
+            .reply
+            .text
+            .contains("GeoIP: retrieved from provider")
+    );
+    assert!(!delivery.reply.text.contains("получено от провайдера"));
 }
 
 #[derive(Default)]
@@ -662,17 +811,29 @@ impl garde_daemon::runtime::Transport for CapturedTelegram {
     }
 }
 #[tokio::test]
-async fn critical_event_reaches_telegram_transport_while_geoip_provider_is_still_waiting() {
+async fn overdue_critical_event_reaches_telegram_transport_while_geoip_provider_is_still_waiting() {
     let dir = tempfile::tempdir().unwrap();
     fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
     let mut config = configuration(dir.path());
     config.geoip.enabled = true;
     config.geoip.token_file = Some(dir.path().join("geo-token"));
-    let bot = Bot::new(config.clone()).unwrap();
     let database = Database::open(config).await.unwrap();
     let mut event = event("critical-transport", "8.8.8.8");
     event.classification.severity = garde_contracts::Severity::Critical;
-    bot.publish_event(&database, event).await.unwrap();
+    database
+        .call(move |s| {
+            s.publish(
+                &event,
+                &[garde_daemon::Reply {
+                    locale: Some("en".into()),
+                    chat_id: "123456789".into(),
+                    text: "Critical event".into(),
+                }],
+                garde_daemon::runtime::now() - 10,
+            )
+        })
+        .await
+        .unwrap();
     let worker_database = database.clone();
     let worker = tokio::spawn(async move {
         garde_daemon::geoip::run_once(&worker_database, &Never, garde_daemon::runtime::now()).await

@@ -177,9 +177,9 @@ impl Bot {
                 }
                 [id] if garde_contracts::Id::new(*id).is_ok() => {
                     let id = id.to_string();
-                    match database.call(move |s| s.geoip_event(&id)).await {
+                    match database.call(move |s| s.geoip_reference(&id)).await {
                         Ok(context) => format!(
-                            "{}\n{}",
+                            "Event: {}\n{}",
                             isolate(context.event_id.as_str()),
                             crate::geoip::render_context(&context, &self.locale)
                         ),
