@@ -111,3 +111,7 @@ See [host health](host-health.md) for filesystem paths, thresholds, reboot detec
 См. [мониторинг служб, портов и baseline](services-ports.md): конфигурация, отдельный listener helper, `/services`, `/ports`, JSON-диагностика и локальное принятие baseline.
 
 See [service, port and baseline monitoring](services-ports.md) for configuration, the separate listener helper, `/services`, `/ports`, JSON diagnostics and local baseline acceptance.
+
+## x-ui/3x-ui
+
+См. [read-only мониторинг x-ui](xui.md): отдельный helper, root-owned политика и диагностика. / See [read-only x-ui monitoring](xui.md) for the separate helper, root-owned policy, and diagnostics.

@@ -461,6 +461,7 @@ dependencies = [
  "garde-config",
  "garde-contracts",
  "garde-entrypoint",
+ "garde-xui",
  "regex",
  "reqwest",
  "rusqlite",
@@ -488,6 +489,7 @@ dependencies = [
  "garde-config",
  "garde-contracts",
  "garde-entrypoint",
+ "garde-xui",
  "rustix",
  "serde",
  "serde_json",
@@ -499,6 +501,21 @@ name = "garde-mcp"
 version = "0.1.0-dev.0"
 dependencies = [
  "garde-entrypoint",
+]
+
+[[package]]
+name = "garde-xui"
+version = "0.1.0-dev.0"
+dependencies = [
+ "chrono",
+ "garde-contracts",
+ "regex",
+ "rusqlite",
+ "rustix",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
 ]
 
 [[package]]

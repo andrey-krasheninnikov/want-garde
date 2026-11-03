@@ -1,0 +1,9 @@
+{
+  "database": "/etc/x-ui/x-ui.db",
+  "journal_unit": "x-ui.service",
+  "files": [
+    { "path": "/var/log/x-ui/access.log", "kind": "access" },
+    { "path": "/usr/local/x-ui/access.log", "kind": "access" },
+    { "path": "/var/log/x-ui/3xipl.log", "kind": "suspicious_ip" }
+  ]
+}

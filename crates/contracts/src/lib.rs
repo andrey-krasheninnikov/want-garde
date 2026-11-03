@@ -56,6 +56,8 @@ pub enum Action {
     ServicesStatus {},
     #[serde(rename = "ports.status")]
     PortsStatus {},
+    #[serde(rename = "xui.status")]
+    XuiStatus {},
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
@@ -113,3 +115,6 @@ pub use ssh::*;
 
 mod firewall;
 pub use firewall::*;
+
+mod xui;
+pub use xui::*;

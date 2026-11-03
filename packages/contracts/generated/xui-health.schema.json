@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "XuiHealth",
+  "type": "object",
+  "properties": {
+    "checked_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "clients": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/XuiClientStatus"
+      }
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "gaps": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "logs_checked_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "schema": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "server_id": {
+      "$ref": "#/$defs/Id"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/XuiSourceHealth"
+      }
+    },
+    "stale": {
+      "type": "boolean"
+    },
+    "version": {
+      "$ref": "#/$defs/WireVersion"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "server_id",
+    "enabled",
+    "stale",
+    "sources",
+    "gaps",
+    "clients"
+  ],
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "WireVersion": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    },
+    "XuiClient": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "inbound_id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "key": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "last_online": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "traffic_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "label",
+        "inbound_id",
+        "enabled",
+        "traffic_bytes"
+      ]
+    },
+    "XuiClientStatus": {
+      "type": "object",
+      "properties": {
+        "client": {
+          "$ref": "#/$defs/XuiClient"
+        },
+        "state": {
+          "$ref": "#/$defs/XuiConnectionState"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "client",
+        "state"
+      ]
+    },
+    "XuiConnectionState": {
+      "type": "string",
+      "enum": [
+        "online",
+        "offline",
+        "disabled",
+        "unknown"
+      ]
+    },
+    "XuiSourceHealth": {
+      "type": "object",
+      "properties": {
+        "gap": {
+          "type": "boolean"
+        },
+        "reason_key": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/Id"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "gap"
+      ]
+    }
+  }
+}

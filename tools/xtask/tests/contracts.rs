@@ -50,6 +50,18 @@ fn schemas_match_valid_examples_and_reject_the_negative_request_corpus() {
     assert!(tool(directory.path(), false).status.success());
     for (schema_name, input) in [
         (
+            "xui-health",
+            include_str!("../../../fixtures/contracts/xui-health.json"),
+        ),
+        (
+            "xui-read-request",
+            include_str!("../../../fixtures/contracts/xui-read-request.json"),
+        ),
+        (
+            "xui-read-response",
+            include_str!("../../../fixtures/contracts/xui-read-response.json"),
+        ),
+        (
             "operation-request",
             include_str!("../../../fixtures/contracts/request.json"),
         ),

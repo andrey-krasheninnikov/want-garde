@@ -1,0 +1,23 @@
+[package]
+name = "garde-xui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+garde-contracts.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+sha2 = "0.10"
+regex = "1.13"
+rusqlite = { version = "0.41.1", features = ["bundled", "limits", "hooks"] }
+rustix = { version = "1.1", features = ["fs", "process"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

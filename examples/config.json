@@ -14,5 +14,11 @@
   "ports": {
     "enabled": true,
     "interval_seconds": 120
+  },
+  "xui": {
+    "enabled": false,
+    "interval_seconds": 30,
+    "client_disconnect_after_seconds": 180,
+    "helper_socket": "/run/want-garde-xui.sock"
   }
 }
