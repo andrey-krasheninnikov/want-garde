@@ -437,6 +437,68 @@ async fn saved_context_and_health_enforce_owner_access_and_follow_saved_language
 struct Unavailable;
 
 #[tokio::test]
+async fn exact_event_without_ip_never_inherits_a_colliding_delivery_context() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let config = configuration(dir.path());
+    let mut bot = Bot::new(config.clone()).unwrap();
+    let database = Database::open(config).await.unwrap();
+    bot.publish_event(&database, event("source-with-context", "8.8.8.8"))
+        .await
+        .unwrap();
+    let first = database
+        .call(|s| s.claim(garde_daemon::runtime::now()))
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(first.reply.text.ends_with("ID: d-1"));
+    database
+        .call(move |s| {
+            s.finish(
+                first.id,
+                garde_daemon::delivery::Outcome::Delivered,
+                garde_daemon::runtime::now(),
+            )
+        })
+        .await
+        .unwrap();
+    let mut without_ip = event("d-1", "8.8.8.8");
+    without_ip.evidence.clear();
+    bot.publish_event(&database, without_ip).await.unwrap();
+    let second = database
+        .call(|s| s.claim(garde_daemon::runtime::now()))
+        .await
+        .unwrap()
+        .unwrap();
+    database
+        .call(move |s| {
+            s.finish(
+                second.id,
+                garde_daemon::delivery::Outcome::Delivered,
+                garde_daemon::runtime::now(),
+            )
+        })
+        .await
+        .unwrap();
+    let update = serde_json::json!({"update_id":0,"message":{"from":{"id":123456789,"is_bot":false},"chat":{"id":123456789,"type":"private"},"text":"/geoip d-1"}});
+    bot.process_update(&database, &update, &Host, "test_bot")
+        .await
+        .unwrap();
+    let response = database
+        .call(|s| s.claim(garde_daemon::runtime::now()))
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        response
+            .reply
+            .text
+            .contains("No saved GeoIP context for this event.")
+    );
+    assert!(!response.reply.text.contains("source-with-context"));
+}
+
+#[tokio::test]
 async fn notification_delivery_id_reads_the_same_context_as_its_event_id() {
     let dir = tempfile::tempdir().unwrap();
     fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();

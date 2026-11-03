@@ -249,8 +249,8 @@ impl Store {
             .filter(|id| *id > 0)
             .ok_or("geoip.not_found")?;
         let value: Option<String> = sql(self.connection.query_row(
-            "SELECT g.payload FROM deliveries d JOIN geoip_context g ON g.event_id=d.event_id WHERE d.id=?1 AND d.chat_id=(SELECT value FROM meta WHERE key='owner')",
-            [delivery],
+            "SELECT g.payload FROM deliveries d JOIN geoip_context g ON g.event_id=d.event_id WHERE d.id=?1 AND d.chat_id=(SELECT value FROM meta WHERE key='owner') AND NOT EXISTS(SELECT 1 FROM events WHERE id=?2)",
+            params![delivery, reference],
             |r| r.get(0),
         ).optional())?;
         decode(&value.ok_or("geoip.not_found")?)
