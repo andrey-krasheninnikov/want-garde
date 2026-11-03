@@ -25,7 +25,7 @@ GeoIP выключен по умолчанию. Включение разреш�
 
 Обогащается только нормализованный IP источника SSH, fail2ban/firewall или x-ui. Destination endpoints, произвольный текст, private, loopback, link-local, multicast, documentation и остальные специальные адреса не отправляются провайдеру. IPv4-mapped IPv6 нормализуется перед проверкой. Скрытый или некорректный адрес не восстанавливается через GeoIP.
 
-Публикация использует локальный кеш. На промахе событие доставляется сразу с отметкой ожидания lookup. Фоновый результат сохраняется для просмотра конкретного события и последующих попаданий в кеш. Исходное уведомление, включая его повторы, не меняется. Дополнительного сообщения нет. Классификация и исходный Event неизменяемы.
+Публикация использует локальный кеш. На промахе первая доставка ожидает фоновый lookup в пределах 10 секунд от сохранения события. Готовый результат или отказ снимает ожидание сразу; дедлайн отправляет уведомление с доступным контекстом или отметкой ожидания. Сбор и сохранение других событий продолжаются. Этот предел относится к ожиданию GeoIP: недоступность Telegram, rate limit и очередь доставки могут задержать отправку. После первой попытки текст, включая повторы, не меняется. Поздний результат сохраняется для просмотра конкретного события и последующих попаданий в кеш. Дополнительного сообщения нет. Классификация и исходный Event неизменяемы.
 
 Состояния: `missing` с объяснением отсутствия, `retrieved` для полученного результата, `cached` для контекста из кеша на момент события. Поздний результат не меняет состояние уже отправленного текста. Raw JSON провайдера и token не сохраняются в событиях, кеше или диагностике. Контекст наследует приватность события; сейчас команды разрешены только владельцу в личных сообщениях.
 
@@ -40,7 +40,7 @@ GeoIP выключен по умолчанию. Включение разреш�
 
 ### Диагностика
 
-`/geoip` показывает состояние, очередь, кеш, запросы за сутки, пропуски и cooldown. `/geoip EVENT_ID` показывает сохранённый контекст события. Это не команда lookup произвольного IP. Полный просмотр истории относится к #11.
+`/geoip` показывает состояние, очередь, кеш, запросы за сутки, пропуски и cooldown. `/geoip EVENT_ID` показывает сохранённый контекст события из строки `Event:`. Можно использовать и `/geoip d-N`, где `d-N` взят из строки `ID:` уведомления о событии. Ответ на команду имеет собственный ID доставки, который не обозначает новое событие. При совпадении идентификаторов приоритет имеет точный Event ID. Каждое IP-уведомление содержит готовую команду `/geoip EVENT_ID`; сообщения оформлены моноширным блоком и доступны для копирования. Это не команда lookup произвольного IP. Полный просмотр истории относится к #11.
 
 Локальные команды читают базу без захвата writer, HTTP и token:
 
@@ -67,7 +67,7 @@ To disable enrichment, set `enabled: false` and restart. Disabled GeoIP neither 
 
 Only normalized source addresses from SSH, fail2ban/firewall and x-ui are eligible. Destination endpoints, arbitrary text, private, loopback, link-local, multicast, documentation and other special-purpose addresses stay local. IPv4-mapped IPv6 is normalized before filtering. GeoIP never reconstructs masked or invalid addresses.
 
-Publication uses the local cache. A cache miss delivers the event immediately with lookup pending. Background results become available for that event and later cache hits. Original notification text, including retries, remains unchanged. No supplemental notification is sent. Classification and the original Event remain immutable.
+Publication uses the local cache. On a cache miss, the initial delivery waits for a background lookup within a ten-second budget from event persistence. A result or failure releases it immediately; the deadline releases it with the available context or a pending marker. Collection and persistence of other events continue. This limit covers GeoIP waiting: Telegram availability, rate limits and the delivery queue can delay sending. Text remains immutable after the first attempt, including retries. Late results become available for that event and later cache hits. No supplemental notification is sent. Classification and the original Event remain immutable.
 
 States are `missing` with a reason, `retrieved` for a fetched result and `cached` for context reused at event time. Late results do not change an already sent message. Raw provider JSON and tokens never enter events, cache or diagnostics. Context inherits event privacy; current commands require the owner in a private chat.
 
@@ -82,7 +82,7 @@ States are `missing` with a reason, `retrieved` for a fetched result and `cached
 
 ### Diagnostics
 
-`/geoip` reports state, queue, cache, daily requests, skips and cooldown. `/geoip EVENT_ID` reads saved event context. Arbitrary IP lookup is unavailable. Full history browsing belongs to #11.
+`/geoip` reports state, queue, cache, daily requests, skips and cooldown. `/geoip EVENT_ID` reads saved context using the notification's `Event:` value. `/geoip d-N` also accepts the event notification's `ID:` value. Command replies have their own delivery IDs, which do not identify new events. An exact Event ID takes precedence if identifiers collide. Every IP notification includes a ready-to-copy `/geoip EVENT_ID` command; messages use a copyable monospace block. Arbitrary IP lookup is unavailable. Full history browsing belongs to #11.
 
 The local commands shown above read the database without claiming the writer, making HTTP requests or reading the token. They emit JSON: exit 0 for a successful event read or ready/disabled status, exit 1 for status requiring attention, and exit 2 for input or storage failure.
 
