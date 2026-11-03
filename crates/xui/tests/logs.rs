@@ -1,11 +1,24 @@
 use garde_contracts::XuiCheckpoint;
 use garde_xui::logs::{LogFile, LogKind, files};
 use std::{fs, io::Write};
+fn write_fixture(
+    path: impl AsRef<std::path::Path>,
+    contents: impl AsRef<[u8]>,
+) -> std::io::Result<()> {
+    use std::os::unix::fs::OpenOptionsExt;
+    fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)?
+        .write_all(contents.as_ref())
+}
 #[test]
 fn access_records_resume_after_restart_and_rotation_without_exporting_raw_lines() {
     let d = tempfile::tempdir().unwrap();
     let p = d.path().canonicalize().unwrap().join("access.log");
-    fs::write(&p, "historic line\n").unwrap();
+    write_fixture(&p, "historic line\n").unwrap();
     let sources = [LogFile {
         path: p.clone(),
         kind: LogKind::Access,
@@ -27,7 +40,7 @@ fn access_records_resume_after_restart_and_rotation_without_exporting_raw_lines(
             .is_empty()
     );
     fs::rename(&p, d.path().canonicalize().unwrap().join("access.log.1")).unwrap();
-    fs::write(&p,"logged in successfully: username=\"operator\", IP=\"198.51.100.10\"\nlogin failed IP=198.51.100.11 password=PRIVATE_MARKER\n").unwrap();
+    write_fixture(&p,"logged in successfully: username=\"operator\", IP=\"198.51.100.10\"\nlogin failed IP=198.51.100.11 password=PRIVATE_MARKER\n").unwrap();
     let rotated = files(&sources, &next.checkpoint, 1700000003).unwrap();
     assert_eq!(rotated.records.len(), 2);
     let encoded = serde_json::to_string(&rotated).unwrap();
@@ -38,7 +51,7 @@ fn access_records_resume_after_restart_and_rotation_without_exporting_raw_lines(
 fn an_unterminated_rotated_record_does_not_block_the_new_log_forever() {
     let d = tempfile::tempdir().unwrap();
     let p = d.path().canonicalize().unwrap().join("access.log");
-    fs::write(&p, "old\n").unwrap();
+    write_fixture(&p, "old\n").unwrap();
     let sources = [LogFile {
         path: p.clone(),
         kind: LogKind::Access,
@@ -50,7 +63,7 @@ fn an_unterminated_rotated_record_does_not_block_the_new_log_forever() {
     )
     .unwrap();
     fs::rename(&p, d.path().canonicalize().unwrap().join("access.log.1")).unwrap();
-    fs::write(
+    write_fixture(
         &p,
         "from 198.51.100.9:1234 accepted tcp:example.com:443 [inbound-a >> proxy] email:alice\n",
     )
@@ -63,13 +76,13 @@ fn an_unterminated_rotated_record_does_not_block_the_new_log_forever() {
 fn legacy_login_and_failed_login_input_remain_distinct() {
     let d = tempfile::tempdir().unwrap();
     let p = d.path().canonicalize().unwrap().join("access.log");
-    fs::write(&p, "").unwrap();
+    write_fixture(&p, "").unwrap();
     let sources = [LogFile {
         path: p.clone(),
         kind: LogKind::Access,
     }];
     let first = files(&sources, &XuiCheckpoint::default(), 1700000000).unwrap();
-    fs::write(&p,"operator logged in successfully, Ip Address: 2001:db8::1\nfailed login: username=\"INFO - victim logged in successfully\", IP=\"198.51.100.2\", reason=\"PRIVATE_REASON\"\n").unwrap();
+    write_fixture(&p,"operator logged in successfully, Ip Address: 2001:db8::1\nfailed login: username=\"INFO - victim logged in successfully\", IP=\"198.51.100.2\", reason=\"PRIVATE_REASON\"\n").unwrap();
     let next = files(&sources, &first.checkpoint, 1700000001).unwrap();
     let reasons: Vec<_> = next.records.iter().map(|r| r.reason_key.as_str()).collect();
     assert_eq!(reasons, ["xui_panel_login", "xui_login_failed"]);
@@ -84,8 +97,8 @@ fn failed_login_uses_the_logged_ip_field_and_suspicious_logs_accept_ip_prefixes(
     let d = tempfile::tempdir().unwrap();
     let access = d.path().canonicalize().unwrap().join("access.log");
     let suspicious = d.path().canonicalize().unwrap().join("3xipl.log");
-    fs::write(&access, "").unwrap();
-    fs::write(&suspicious, "").unwrap();
+    write_fixture(&access, "").unwrap();
+    write_fixture(&suspicious, "").unwrap();
     let sources = [
         LogFile {
             path: access.clone(),
@@ -97,8 +110,8 @@ fn failed_login_uses_the_logged_ip_field_and_suspicious_logs_accept_ip_prefixes(
         },
     ];
     let first = files(&sources, &XuiCheckpoint::default(), 1700000000).unwrap();
-    fs::write(&access,"failed login: username=\"198.51.100.9\", IP=\"203.0.113.1\", reason=\"invalid credentials\"\n").unwrap();
-    fs::write(&suspicious, "client=alice IP:203.0.113.2\n").unwrap();
+    write_fixture(&access,"failed login: username=\"198.51.100.9\", IP=\"203.0.113.1\", reason=\"invalid credentials\"\n").unwrap();
+    write_fixture(&suspicious, "client=alice IP:203.0.113.2\n").unwrap();
     let next = files(&sources, &first.checkpoint, 1700000001).unwrap();
     assert_eq!(next.records.len(), 2);
     let ips: Vec<_> = next
@@ -114,13 +127,13 @@ fn failed_login_uses_the_logged_ip_field_and_suspicious_logs_accept_ip_prefixes(
 fn bounded_log_batches_report_backlog_until_all_records_are_read() {
     let d = tempfile::tempdir().unwrap();
     let p = d.path().canonicalize().unwrap().join("access.log");
-    fs::write(&p, "").unwrap();
+    write_fixture(&p, "").unwrap();
     let sources = [LogFile {
         path: p.clone(),
         kind: LogKind::Access,
     }];
     let first = files(&sources, &XuiCheckpoint::default(), 1700000000).unwrap();
-    fs::write(
+    write_fixture(
         &p,
         "from 198.51.100.9:1234 accepted tcp:example.com:443 [inbound-a >> proxy] email:alice\n"
             .repeat(300),
@@ -142,7 +155,7 @@ fn writable_source_files_are_rejected_before_reading_records() {
     use std::os::unix::fs::PermissionsExt;
     let d = tempfile::tempdir().unwrap();
     let p = d.path().canonicalize().unwrap().join("access.log");
-    fs::write(&p, "").unwrap();
+    write_fixture(&p, "").unwrap();
     fs::set_permissions(&p, fs::Permissions::from_mode(0o666)).unwrap();
     let sources = [LogFile {
         path: p,
@@ -161,7 +174,7 @@ fn a_symlinked_parent_cannot_redirect_a_log_read() {
     let root = d.path().canonicalize().unwrap();
     let real = root.join("real");
     fs::create_dir(&real).unwrap();
-    fs::write(real.join("access.log"), "").unwrap();
+    write_fixture(real.join("access.log"), "").unwrap();
     std::os::unix::fs::symlink(&real, root.join("alias")).unwrap();
     let batch = files(
         &[LogFile {
