@@ -61,9 +61,9 @@ jobs:
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           mkdir -p target/installation
           install -m 755 target/release/want-garde target/release/want-garde-daemon target/release/want-garde-helper target/installation/
-          cp packaging/systemd/want-garde.service packaging/systemd/want-garde-helper.socket packaging/systemd/want-garde-helper@.service examples/config.json target/installation/
+          cp packaging/systemd/want-garde.service packaging/systemd/want-garde-helper.socket packaging/systemd/want-garde-helper@.service packaging/systemd/want-garde-listeners.socket packaging/systemd/want-garde-listeners@.service examples/config.json target/installation/
           printf '%s\n' "$SOURCE_SHA" > target/installation/revision
-          (cd target/installation && sha256sum want-garde want-garde-daemon want-garde-helper want-garde.service want-garde-helper.socket want-garde-helper@.service config.json revision > SHA256SUMS)
+          (cd target/installation && sha256sum want-garde want-garde-daemon want-garde-helper want-garde.service want-garde-helper.socket want-garde-helper@.service want-garde-listeners.socket want-garde-listeners@.service config.json revision > SHA256SUMS)
           tar -czf target/want-garde-linux-x86_64.tar.gz -C target/installation .
           (cd target && sha256sum want-garde-linux-x86_64.tar.gz > want-garde-linux-x86_64.tar.gz.sha256)
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

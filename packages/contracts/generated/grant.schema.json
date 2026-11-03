@@ -32,6 +32,8 @@
       "enum": [
         "status.read",
         "bans.read",
+        "services.read",
+        "ports.read",
         "events.read",
         "incidents.read"
       ]

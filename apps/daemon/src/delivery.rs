@@ -428,9 +428,89 @@ impl Store {
         publications: &[(Event, Vec<Reply>)],
         now: i64,
     ) -> Result<()> {
-        crate::host_health::validate_state(state)?;
-        if self.host_state()?.as_deref() != previous {
-            return Err("host.state_changed");
+        if publications.len() > 40 || publications.iter().map(|(_, r)| r.len()).sum::<usize>() > 40
+        {
+            return Err("event.invalid");
+        }
+        self.publish_observation("host.state", previous, state, publications, now)
+    }
+    pub(crate) fn observation_state(&self, key: &str) -> Result<Option<String>> {
+        sql(self
+            .connection
+            .query_row("SELECT value FROM meta WHERE key=?1", [key], |r| r.get(0))
+            .optional())
+    }
+    pub fn inspect_observation(config: &garde_config::Config, key: &str) -> Result<Option<String>> {
+        let connection = inspect_connection(
+            &config.state_dir,
+            config.server_id.as_str(),
+            config.owner()?,
+        )?;
+        sql(connection
+            .query_row("SELECT value FROM meta WHERE key=?1", [key], |r| r.get(0))
+            .optional())
+    }
+    pub fn ports_health(
+        &self,
+        config: &garde_config::Config,
+        now: i64,
+    ) -> Result<garde_contracts::PortsHealth> {
+        crate::listeners::health(
+            config,
+            self.observation_state("ports.state")?.as_deref(),
+            now,
+        )
+    }
+    pub fn inspect_ports(
+        config: &garde_config::Config,
+        now: i64,
+    ) -> Result<garde_contracts::PortsHealth> {
+        crate::listeners::health(
+            config,
+            Self::inspect_observation(config, "ports.state")?.as_deref(),
+            now,
+        )
+    }
+    pub fn services_health(
+        &self,
+        config: &garde_config::Config,
+        now: i64,
+    ) -> Result<garde_contracts::ServicesHealth> {
+        crate::services::health(
+            config,
+            self.observation_state("services.state")?.as_deref(),
+            now,
+        )
+    }
+    pub fn inspect_services(
+        config: &garde_config::Config,
+        now: i64,
+    ) -> Result<garde_contracts::ServicesHealth> {
+        crate::services::health(
+            config,
+            Self::inspect_observation(config, "services.state")?.as_deref(),
+            now,
+        )
+    }
+    pub(crate) fn publish_observation(
+        &mut self,
+        key: &str,
+        previous: Option<&str>,
+        state: &str,
+        publications: &[(Event, Vec<Reply>)],
+        now: i64,
+    ) -> Result<()> {
+        match key {
+            "host.state" => crate::host_health::validate_state(state)?,
+            "services.state" => crate::services::validate_state(state)?,
+            "ports.state" => crate::listeners::validate_state(state)?,
+            _ => return Err("monitor.state"),
+        }
+        if state.len() > 524288 {
+            return Err("monitor.state");
+        }
+        if self.observation_state(key)?.as_deref() != previous {
+            return Err("monitor.state_changed");
         }
         let server: String =
             sql(self
@@ -448,7 +528,7 @@ impl Store {
             count += replies.len();
             events.push(payload);
         }
-        if publications.len() > 40 || count > 40 || now < 0 {
+        if publications.len() > 256 || count > 256 || now < 0 {
             return Err("event.invalid");
         }
         self.admit(count as i64, now)?;
@@ -469,7 +549,10 @@ impl Store {
                 )?;
             }
         }
-        sql(transaction.execute("INSERT INTO meta VALUES('host.state',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",[state]))?;
+        sql(transaction.execute(
+            "INSERT INTO meta VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            params![key, state],
+        ))?;
         sql(transaction.commit())
     }
     pub fn host_health(

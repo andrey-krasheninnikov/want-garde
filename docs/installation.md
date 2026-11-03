@@ -105,3 +105,9 @@ The service reads the system journal through `SupplementaryGroups=systemd-journa
 See [host health](host-health.md) for filesystem paths, thresholds, reboot detection, and `--host-status`.
 
 Пути файловых систем, пороги, проверка reboot и `--host-status` описаны в [состоянии хоста](host-health.md).
+
+## Services and listeners / Службы и listeners
+
+См. [мониторинг служб, портов и baseline](services-ports.md): конфигурация, отдельный listener helper, `/services`, `/ports`, JSON-диагностика и локальное принятие baseline.
+
+See [service, port and baseline monitoring](services-ports.md) for configuration, the separate listener helper, `/services`, `/ports`, JSON diagnostics and local baseline acceptance.

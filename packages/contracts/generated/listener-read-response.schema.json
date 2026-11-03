@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ListenerReadResponse",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "ipv4": {
+          "type": "string"
+        },
+        "ipv6": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "snapshot"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "ipv4",
+        "ipv6"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "reason_key": {
+          "$ref": "#/$defs/Id"
+        },
+        "type": {
+          "type": "string",
+          "const": "unavailable"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "reason_key"
+      ]
+    }
+  ],
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    }
+  }
+}

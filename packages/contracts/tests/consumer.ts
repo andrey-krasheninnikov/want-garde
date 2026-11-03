@@ -121,3 +121,46 @@ const invalidBan: import("../generated/index").JailBans = {
   reason_key: null,
 };
 void [bansAction, bansResult, firewall, invalidBan];
+
+const services: import("../generated/index").ServicesHealth = {
+  version: "1",
+  server_id: "server-demo",
+  checked_at: null,
+  enabled: false,
+  stale: true,
+  services: [],
+  down: [],
+};
+const ports: import("../generated/index").PortsHealth = {
+  version: "1",
+  server_id: "server-demo",
+  enabled: true,
+  stale: true,
+  snapshot: null,
+  baseline: null,
+  added: [],
+  removed: [],
+  suspicious: [],
+  problems: [],
+};
+const serviceResult: OperationResult = {
+  type: "services_status",
+  server_id: "server-demo",
+  health: services,
+};
+const portsResult: OperationResult = {
+  type: "ports_status",
+  server_id: "server-demo",
+  health: ports,
+};
+const listener: import("../generated/index").Endpoint = {
+  family: "ipv6",
+  protocol: "tcp",
+  address: "::",
+  port: 8080,
+};
+// @ts-expect-error Baseline acceptance is local, never a remote action.
+const remoteAccept: Action = { type: "ports.baseline.accept" };
+// @ts-expect-error No executable may be supplied to a read request.
+const rootRead: Action = { type: "ports.status", executable: "/bin/sh" };
+void [serviceResult, portsResult, listener, remoteAccept, rootRead];

@@ -28,6 +28,13 @@
     "state"
   ],
   "$defs": {
+    "AddressFamily": {
+      "type": "string",
+      "enum": [
+        "ipv4",
+        "ipv6"
+      ]
+    },
     "BansSnapshot": {
       "type": "object",
       "properties": {
@@ -108,13 +115,13 @@
       "type": "object",
       "properties": {
         "inodes": {
-          "$ref": "#/$defs/Measurement7"
+          "$ref": "#/$defs/Measurement8"
         },
         "path": {
           "type": "string"
         },
         "space": {
-          "$ref": "#/$defs/Measurement6"
+          "$ref": "#/$defs/Measurement7"
         }
       },
       "additionalProperties": false,
@@ -150,6 +157,33 @@
         "available_bytes"
       ]
     },
+    "Endpoint": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "family": {
+          "$ref": "#/$defs/AddressFamily"
+        },
+        "port": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "protocol": {
+          "$ref": "#/$defs/ListenerProtocol"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "protocol",
+        "address",
+        "port"
+      ]
+    },
     "ErrorCode": {
       "type": "string",
       "enum": [
@@ -166,14 +200,14 @@
       "type": "object",
       "properties": {
         "cpu_count": {
-          "$ref": "#/$defs/Measurement2",
+          "$ref": "#/$defs/Measurement3",
           "default": {
             "reason_key": "source.unavailable",
             "type": "unavailable"
           }
         },
         "cpu_usage_percent": {
-          "$ref": "#/$defs/Measurement3"
+          "$ref": "#/$defs/Measurement4"
         },
         "disks": {
           "type": "array",
@@ -183,43 +217,43 @@
           }
         },
         "hostname": {
-          "$ref": "#/$defs/Measurement"
+          "$ref": "#/$defs/Measurement2"
         },
         "kernel": {
-          "$ref": "#/$defs/Measurement"
+          "$ref": "#/$defs/Measurement2"
         },
         "load_average": {
-          "$ref": "#/$defs/Measurement4"
+          "$ref": "#/$defs/Measurement5"
         },
         "load_per_core": {
-          "$ref": "#/$defs/Measurement4",
+          "$ref": "#/$defs/Measurement5",
           "default": {
             "reason_key": "source.unavailable",
             "type": "unavailable"
           }
         },
         "memory": {
-          "$ref": "#/$defs/Measurement5"
+          "$ref": "#/$defs/Measurement6"
         },
         "observed_at": {
           "type": "string",
           "format": "date-time"
         },
         "os": {
-          "$ref": "#/$defs/Measurement"
+          "$ref": "#/$defs/Measurement2"
         },
         "reboot_required": {
-          "$ref": "#/$defs/Measurement8",
+          "$ref": "#/$defs/Measurement9",
           "default": {
             "reason_key": "source.unavailable",
             "type": "unavailable"
           }
         },
         "root_disk": {
-          "$ref": "#/$defs/Measurement5"
+          "$ref": "#/$defs/Measurement6"
         },
         "uptime_seconds": {
-          "$ref": "#/$defs/Measurement2"
+          "$ref": "#/$defs/Measurement3"
         }
       },
       "additionalProperties": false,
@@ -416,7 +450,103 @@
         }
       ]
     },
+    "Listener": {
+      "type": "object",
+      "properties": {
+        "endpoint": {
+          "$ref": "#/$defs/Endpoint"
+        },
+        "ignored": {
+          "type": "boolean"
+        },
+        "process_reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "processes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ListenerProcess"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "endpoint",
+        "processes",
+        "ignored"
+      ]
+    },
+    "ListenerProcess": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "pid": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "pid",
+        "name"
+      ]
+    },
+    "ListenerProtocol": {
+      "type": "string",
+      "enum": [
+        "tcp",
+        "udp"
+      ]
+    },
     "Measurement": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "available"
+            },
+            "value": {
+              "$ref": "#/$defs/ServiceStatus"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "reason_key": {
+              "$ref": "#/$defs/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "unavailable"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "reason_key"
+          ]
+        }
+      ]
+    },
+    "Measurement2": {
       "oneOf": [
         {
           "type": "object",
@@ -454,7 +584,7 @@
         }
       ]
     },
-    "Measurement2": {
+    "Measurement3": {
       "oneOf": [
         {
           "type": "object",
@@ -494,7 +624,7 @@
         }
       ]
     },
-    "Measurement3": {
+    "Measurement4": {
       "oneOf": [
         {
           "type": "object",
@@ -533,7 +663,7 @@
         }
       ]
     },
-    "Measurement4": {
+    "Measurement5": {
       "oneOf": [
         {
           "type": "object",
@@ -577,7 +707,7 @@
         }
       ]
     },
-    "Measurement5": {
+    "Measurement6": {
       "oneOf": [
         {
           "type": "object",
@@ -615,7 +745,7 @@
         }
       ]
     },
-    "Measurement6": {
+    "Measurement7": {
       "oneOf": [
         {
           "type": "object",
@@ -653,7 +783,7 @@
         }
       ]
     },
-    "Measurement7": {
+    "Measurement8": {
       "oneOf": [
         {
           "type": "object",
@@ -691,7 +821,7 @@
         }
       ]
     },
-    "Measurement8": {
+    "Measurement9": {
       "oneOf": [
         {
           "type": "object",
@@ -731,6 +861,48 @@
     },
     "OperationResult": {
       "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "health": {
+              "$ref": "#/$defs/ServicesHealth"
+            },
+            "server_id": {
+              "$ref": "#/$defs/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "services_status"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "server_id",
+            "health"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "health": {
+              "$ref": "#/$defs/PortsHealth"
+            },
+            "server_id": {
+              "$ref": "#/$defs/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "ports_status"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "server_id",
+            "health"
+          ]
+        },
         {
           "type": "object",
           "properties": {
@@ -777,6 +949,259 @@
             "snapshot"
           ]
         }
+      ]
+    },
+    "PortBaseline": {
+      "type": "object",
+      "properties": {
+        "accepted_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "endpoints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Endpoint"
+          }
+        },
+        "filter_hash": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "hash",
+        "filter_hash",
+        "accepted_at",
+        "endpoints"
+      ]
+    },
+    "PortsHealth": {
+      "type": "object",
+      "properties": {
+        "added": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Endpoint"
+          }
+        },
+        "baseline": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PortBaseline"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "problems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          }
+        },
+        "removed": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Endpoint"
+          }
+        },
+        "server_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "snapshot": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PortsSnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stale": {
+          "type": "boolean"
+        },
+        "suspicious": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SuspiciousListener"
+          }
+        },
+        "version": {
+          "$ref": "#/$defs/WireVersion"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "server_id",
+        "enabled",
+        "stale",
+        "added",
+        "removed",
+        "suspicious",
+        "problems"
+      ]
+    },
+    "PortsSnapshot": {
+      "type": "object",
+      "properties": {
+        "complete": {
+          "type": "boolean"
+        },
+        "ephemeral_range": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "ignored_count": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "listeners": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Listener"
+          }
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "processes_complete": {
+          "type": "boolean"
+        },
+        "range_fallback": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "observed_at",
+        "listeners",
+        "complete",
+        "processes_complete",
+        "ignored_count",
+        "ephemeral_range",
+        "range_fallback"
+      ]
+    },
+    "ServiceObservation": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/Measurement"
+        },
+        "unit": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "unit",
+        "state"
+      ]
+    },
+    "ServiceStatus": {
+      "type": "object",
+      "properties": {
+        "active_state": {
+          "type": "string"
+        },
+        "load_state": {
+          "type": "string"
+        },
+        "sub_state": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "load_state",
+        "active_state",
+        "sub_state"
+      ]
+    },
+    "ServicesHealth": {
+      "type": "object",
+      "properties": {
+        "checked_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "down": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "server_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "services": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ServiceObservation"
+          }
+        },
+        "stale": {
+          "type": "boolean"
+        },
+        "version": {
+          "$ref": "#/$defs/WireVersion"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "server_id",
+        "enabled",
+        "stale",
+        "services",
+        "down"
+      ]
+    },
+    "SuspiciousListener": {
+      "type": "object",
+      "properties": {
+        "endpoint": {
+          "$ref": "#/$defs/Endpoint"
+        },
+        "process_name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "endpoint",
+        "process_name"
       ]
     },
     "WireVersion": {

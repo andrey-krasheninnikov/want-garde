@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BaselinePreview",
+  "type": "object",
+  "properties": {
+    "added": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Endpoint"
+      }
+    },
+    "endpoints": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Endpoint"
+      }
+    },
+    "hash": {
+      "type": "string"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "previous_hash": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "removed": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Endpoint"
+      }
+    },
+    "server_id": {
+      "$ref": "#/$defs/Id"
+    },
+    "version": {
+      "$ref": "#/$defs/WireVersion"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "server_id",
+    "observed_at",
+    "hash",
+    "endpoints",
+    "added",
+    "removed"
+  ],
+  "$defs": {
+    "AddressFamily": {
+      "type": "string",
+      "enum": [
+        "ipv4",
+        "ipv6"
+      ]
+    },
+    "Endpoint": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "family": {
+          "$ref": "#/$defs/AddressFamily"
+        },
+        "port": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "protocol": {
+          "$ref": "#/$defs/ListenerProtocol"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "protocol",
+        "address",
+        "port"
+      ]
+    },
+    "Id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "ListenerProtocol": {
+      "type": "string",
+      "enum": [
+        "tcp",
+        "udp"
+      ]
+    },
+    "WireVersion": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    }
+  }
+}
