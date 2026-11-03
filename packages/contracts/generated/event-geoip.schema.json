@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EventGeoIp",
+  "type": "object",
+  "properties": {
+    "details": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GeoIpDetails"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "event_id": {
+      "$ref": "#/$defs/Id"
+    },
+    "fetched_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "ip": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "provider": {
+      "type": "string"
+    },
+    "reason_key": {
+      "$ref": "#/$defs/Id"
+    },
+    "server_id": {
+      "$ref": "#/$defs/Id"
+    },
+    "state": {
+      "$ref": "#/$defs/GeoIpState"
+    },
+    "version": {
+      "$ref": "#/$defs/WireVersion"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "server_id",
+    "event_id",
+    "state",
+    "reason_key",
+    "provider"
+  ],
+  "$defs": {
+    "GeoIpDetails": {
+      "type": "object",
+      "properties": {
+        "asn": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "country_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "organization": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "GeoIpState": {
+      "type": "string",
+      "enum": [
+        "missing",
+        "cached",
+        "retrieved"
+      ]
+    },
+    "Id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "WireVersion": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    }
+  }
+}

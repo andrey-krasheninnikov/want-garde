@@ -7,6 +7,7 @@ use std::{fs, future::Future, path::PathBuf};
 
 pub mod delivery;
 pub mod firewall;
+pub mod geoip;
 pub mod host;
 pub mod host_health;
 pub mod ingest;
@@ -23,6 +24,8 @@ pub trait StatusSource {
 
 #[derive(Debug, Serialize)]
 pub struct Reply {
+    #[serde(skip)]
+    pub locale: Option<String>,
     pub chat_id: String,
     pub text: String,
 }
@@ -134,6 +137,7 @@ impl Bot {
             _ => message(&self.locale, "help_commands").to_owned(),
         };
         Ok(Some(Reply {
+            locale: None,
             chat_id: owner.to_owned(),
             text,
         }))
@@ -165,7 +169,32 @@ impl Bot {
         if id < offset {
             return Ok(offset);
         }
-        let reply = if let Some((command @ ("/services" | "/ports" | "/xui"), args)) =
+        let reply = if let Some(("/geoip", args)) = self.command(update, username) {
+            let text = match args.as_slice() {
+                [] => {
+                    let health = database.call(|s| s.geoip_health(runtime::now())).await?;
+                    crate::geoip::render_health(&health, &self.locale)
+                }
+                [id] if garde_contracts::Id::new(*id).is_ok() => {
+                    let id = id.to_string();
+                    match database.call(move |s| s.geoip_event(&id)).await {
+                        Ok(context) => format!(
+                            "{}\n{}",
+                            isolate(context.event_id.as_str()),
+                            crate::geoip::render_context(&context, &self.locale)
+                        ),
+                        Err("geoip.not_found") => message(&self.locale, "geoip_not_found").into(),
+                        Err(code) => return Err(code),
+                    }
+                }
+                _ => message(&self.locale, "geoip_usage").into(),
+            };
+            Some(Reply {
+                locale: None,
+                chat_id: self.config.owner()?.into(),
+                text,
+            })
+        } else if let Some((command @ ("/services" | "/ports" | "/xui"), args)) =
             self.command(update, username)
         {
             let text = match crate::observation::page(&args) {
@@ -193,6 +222,7 @@ impl Bot {
                 }
             };
             Some(Reply {
+                locale: None,
                 chat_id: self.config.owner()?.into(),
                 text,
             })
@@ -202,6 +232,7 @@ impl Bot {
         {
             let health = database.call(|store| store.health(runtime::now())).await?;
             Some(Reply {
+                locale: None,
                 chat_id: self.config.owner()?.into(),
                 text: render_delivery(&health, &self.locale),
             })
@@ -214,6 +245,7 @@ impl Bot {
                 .call(move |store| store.ssh_health(&config, runtime::now()))
                 .await?;
             Some(Reply {
+                locale: None,
                 chat_id: self.config.owner()?.into(),
                 text: render_ssh(&health, &self.locale),
             })
@@ -239,6 +271,7 @@ impl Bot {
                 firewall::render_health(&health, &self.locale)
             );
             Some(Reply {
+                locale: None,
                 chat_id: self.config.owner()?.into(),
                 text,
             })
@@ -248,6 +281,7 @@ impl Bot {
                 Err(code) => {
                     eprintln!("{code}: {}", message(&self.locale, "operation_failed"));
                     Some(Reply {
+                        locale: None,
                         chat_id: self.config.owner()?.into(),
                         text: message(&self.locale, "operation_failed").into(),
                     })
@@ -316,6 +350,7 @@ impl Bot {
             ));
         }
         let replies = vec![Reply {
+            locale: Some(self.locale.clone()),
             chat_id: self.config.owner()?.into(),
             text,
         }];

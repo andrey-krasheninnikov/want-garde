@@ -89,3 +89,9 @@ HostSnapshot добавляет `cpu_count`, `load_per_core`, `disks` и `reboot
 ## x-ui observation / Наблюдение x-ui
 
 `xui.status` и `xui.read` описывают просмотр сохранённого состояния; разрешений на изменение панели нет. `XuiHealth` отделяет здоровье источников от состояния соединений. Закрытый `XuiReadRequest` допускает только snapshot либо logs с checkpoint; `XuiReadResponse` содержит нормализованные данные без сырых журналов и секретов. / `xui.status` and `xui.read` describe saved-state inspection without panel mutations. `XuiHealth` separates source health from connectivity. The closed `XuiReadRequest` accepts only snapshot or checkpointed logs; `XuiReadResponse` contains normalized data without raw logs or secrets.
+
+## GeoIP context / Контекст GeoIP
+
+`geoip.status` и `geoip.event` с `event_id` добавляют read actions/results и `geoip.read`. `GeoIpHealth` показывает ограниченное состояние worker; `EventGeoIp` хранит отдельный контекст `missing`, `cached` или `retrieved` со ссылкой на server/event и временем получения. `Event` остаётся неизменным. Новые DTO расширяют unreleased wire version 1; компоненты обновляются вместе. [Приватность и лимиты](geoip.md).
+
+`geoip.status` and `geoip.event` with `event_id` add read actions/results and `geoip.read`. `GeoIpHealth` reports bounded worker state; `EventGeoIp` stores separate `missing`, `cached` or `retrieved` context linked to server/event and retrieval time. `Event` remains unchanged. New DTOs extend unreleased wire version 1; components update together. See [privacy and limits](geoip.md).

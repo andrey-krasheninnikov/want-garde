@@ -1,3 +1,5 @@
+mod geoip;
+pub use geoip::GeoIpConfig;
 mod host;
 mod monitoring;
 mod xui;
@@ -38,6 +40,8 @@ pub struct Config {
     pub ports: PortsConfig,
     #[serde(default)]
     pub xui: XuiConfig,
+    #[serde(default)]
+    pub geoip: GeoIpConfig,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -118,7 +122,13 @@ impl Config {
         let value: Self =
             serde_json::from_slice(&read_private(path, 65536)?).map_err(|_| "config.invalid")?;
         let valid_source = |source: &SshConfig| !matches!(source, SshConfig::File { path } if !path.is_absolute() || path.components().any(|p| matches!(p, std::path::Component::ParentDir)) || path.as_os_str().len() > 4096);
-        if !value.xui.valid()
+        if !value.geoip.valid()
+            || value
+                .geoip
+                .token_file
+                .as_ref()
+                .is_some_and(|p| p == &value.bot_token_file || p == path)
+            || !value.xui.valid()
             || !value.ports.valid()
             || !value.services.valid()
             || !value.host_health.valid()

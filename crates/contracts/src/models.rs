@@ -70,6 +70,8 @@ pub struct Incident {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
 pub enum Capability {
+    #[serde(rename = "geoip.read")]
+    GeoIpRead,
     #[serde(rename = "status.read")]
     StatusRead,
     #[serde(rename = "bans.read")]
@@ -106,6 +108,12 @@ pub struct Grant {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, TS)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum OperationResult {
+    GeoIpStatus {
+        health: Box<crate::GeoIpHealth>,
+    },
+    GeoIpEvent {
+        context: Box<crate::EventGeoIp>,
+    },
     XuiStatus {
         server_id: Id,
         health: Box<crate::XuiHealth>,

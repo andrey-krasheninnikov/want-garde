@@ -13,6 +13,8 @@ pub fn contract_artifacts() -> Result<BTreeMap<&'static str, String>, serde_json
     }
     schema!("operation-request.schema.json", OperationRequest);
     schema!("event.schema.json", Event);
+    schema!("geoip-health.schema.json", GeoIpHealth);
+    schema!("event-geoip.schema.json", EventGeoIp);
     schema!("incident.schema.json", Incident);
     schema!("grant.schema.json", Grant);
     schema!("job.schema.json", Job);
@@ -54,6 +56,10 @@ pub fn contract_artifacts() -> Result<BTreeMap<&'static str, String>, serde_json
         Classification,
         Evidence,
         Event,
+        GeoIpState,
+        GeoIpDetails,
+        EventGeoIp,
+        GeoIpHealth,
         IncidentState,
         Incident,
         Capability,

@@ -208,3 +208,21 @@ const invalidXui: import("../generated/index").XuiReadRequest = {
   sql: "select password from users",
 };
 void [xuiRequest, xuiHealth, xuiAction, invalidXui];
+
+const geoip: import("../generated/index").EventGeoIp = {
+  version: "1",
+  server_id: "server-demo",
+  event_id: "event-001",
+  ip: "8.8.8.8",
+  state: "retrieved",
+  reason_key: "geoip_retrieved",
+  provider: "ipinfo_lite",
+  fetched_at: "2026-11-03T00:00:00Z",
+  details: { country_code: "US", asn: 15169, organization: "Example network" },
+};
+const geoipAction: Action = { type: "geoip.event", event_id: "event-001" };
+// @ts-expect-error Arbitrary IP lookup is not a read action.
+const arbitraryGeoip: Action = { type: "geoip.event", ip: "8.8.8.8" };
+// @ts-expect-error Context states use the documented vocabulary.
+const inventedGeoipState: import("../generated/index").GeoIpState = "guaranteed";
+void [geoip, geoipAction, arbitraryGeoip, inventedGeoipState];

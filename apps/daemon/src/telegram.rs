@@ -305,6 +305,7 @@ mod tests {
         assert_eq!(api.identity().await.unwrap().username, "test_bot");
         assert_eq!(api.updates(42).await.unwrap()[0]["update_id"], 42);
         api.send(&Reply {
+            locale: None,
             chat_id: "123456789".into(),
             text: "שלום <host> مرحبا".into(),
         })
@@ -348,6 +349,7 @@ mod tests {
             )]);
             let error = api
                 .send(&Reply {
+                    locale: None,
                     chat_id: "123456789".into(),
                     text: "result".into(),
                 })
@@ -364,6 +366,7 @@ mod tests {
         )]);
         let error = api
             .send(&Reply {
+                locale: None,
                 chat_id: "123456789".into(),
                 text: "result".into(),
             })
@@ -378,6 +381,7 @@ mod tests {
         )]);
         let error = api
             .send(&Reply {
+                locale: None,
                 chat_id: "123456789".into(),
                 text: "result".into(),
             })

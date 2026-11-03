@@ -127,3 +127,18 @@ fn xui_contracts_preserve_examples_and_reject_unversioned_or_executable_requests
         assert!(serde_json::from_str::<garde_contracts::XuiReadRequest>(input).is_err());
     }
 }
+
+#[test]
+fn geoip_context_and_health_preserve_synthetic_examples_and_reject_unknown_fields() {
+    roundtrip::<garde_contracts::EventGeoIp>(include_str!(
+        "../../../fixtures/contracts/event-geoip.json"
+    ));
+    roundtrip::<garde_contracts::GeoIpHealth>(include_str!(
+        "../../../fixtures/contracts/geoip-health.json"
+    ));
+    let good = serde_json::json!({"version":"1","request_id":"geo-request","server_id":"server-demo","action":{"type":"geoip.event","event_id":"event-001"}});
+    assert!(garde_contracts::decode_request(&good.to_string()).is_ok());
+    let mut bad = good;
+    bad["action"]["ip"] = serde_json::json!("8.8.8.8");
+    assert!(garde_contracts::decode_request(&bad.to_string()).is_err());
+}

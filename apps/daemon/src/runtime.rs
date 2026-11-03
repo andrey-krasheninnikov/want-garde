@@ -57,6 +57,11 @@ impl Database {
                         return;
                     }
                 };
+                store.geoip_config = Some(config.clone());
+                if let Err(code) = store.recover_geoip(now()) {
+                    let _ = ready.send(Err(code));
+                    return;
+                }
                 if ready.send(Ok(())).is_err() {
                     return;
                 }
@@ -263,6 +268,7 @@ pub async fn serve(config: Config) -> Result<()> {
         database.clone(),
     );
     tokio::try_join!(
+        crate::geoip::run(config.clone(), database.clone()),
         host.run(&source),
         services.run(),
         ports.run(),

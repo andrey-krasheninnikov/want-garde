@@ -24,6 +24,7 @@ fn expired_events_are_not_sent_after_the_delivery_deadline() {
         .publish(
             &event,
             &[Reply {
+                locale: None,
                 chat_id: "123456789".into(),
                 text: "expired alert".into(),
             }],
@@ -43,6 +44,7 @@ fn a_second_writer_cannot_recover_an_active_sending_attempt() {
         .publish(
             &event,
             &[Reply {
+                locale: None,
                 chat_id: "123456789".into(),
                 text: "active alert".into(),
             }],
@@ -59,6 +61,7 @@ fn command_replies_and_polling_progress_commit_together_and_expire_after_ten_min
     let mut store = Store::open(dir.path(), "server-demo", "123456789").unwrap();
     let reply = || {
         Some(Reply {
+            locale: None,
             chat_id: "123456789".into(),
             text: "saved status snapshot".into(),
         })
@@ -80,6 +83,7 @@ fn retries_back_off_and_keep_the_original_delivery_identifier() {
         .consume_update(
             1,
             Some(Reply {
+                locale: None,
                 chat_id: "123456789".into(),
                 text: "retry result".into(),
             }),
@@ -124,6 +128,7 @@ fn ambiguous_attempts_and_permanent_failures_remain_diagnosable_without_message_
         .publish(
             &event,
             &[Reply {
+                locale: None,
                 chat_id: "123456789".into(),
                 text: "private_result_do_not_disclose".into(),
             }],
@@ -173,6 +178,7 @@ fn local_inspection_does_not_recover_or_modify_an_active_attempt() {
         .consume_update(
             1,
             Some(Reply {
+                locale: None,
                 chat_id: "123456789".into(),
                 text: "active reply".into(),
             }),
@@ -220,6 +226,7 @@ fn invalid_replies_do_not_advance_the_polling_offset() {
             .consume_update(
                 42,
                 Some(Reply {
+                    locale: None,
                     chat_id: "123456789".into(),
                     text: "x".repeat(4000)
                 }),
@@ -241,6 +248,7 @@ fn retry_limits_still_apply_when_the_clock_moves_backwards() {
         .publish(
             &event,
             &[Reply {
+                locale: None,
                 chat_id: "123456789".into(),
                 text: "bounded retries".into(),
             }],
@@ -277,10 +285,12 @@ fn retention_removes_completed_records_and_preserves_unfinished_delivery() {
             &event,
             &[
                 Reply {
+                    locale: None,
                     chat_id: "123456789".into(),
                     text: "completed".into(),
                 },
                 Reply {
+                    locale: None,
                     chat_id: "987654321".into(),
                     text: "unfinished".into(),
                 },
@@ -294,6 +304,7 @@ fn retention_removes_completed_records_and_preserves_unfinished_delivery() {
         .consume_update(
             42,
             Some(Reply {
+                locale: None,
                 chat_id: "123456789".into(),
                 text: "new reply".into(),
             }),
@@ -322,6 +333,7 @@ fn rate_limit_cooldown_survives_restart_and_expiration_of_the_original_reply() {
         .consume_update(
             1,
             Some(Reply {
+                locale: None,
                 chat_id: "123456789".into(),
                 text: "rate limited".into(),
             }),
@@ -344,6 +356,7 @@ fn rate_limit_cooldown_survives_restart_and_expiration_of_the_original_reply() {
         .consume_update(
             2,
             Some(Reply {
+                locale: None,
                 chat_id: "123456789".into(),
                 text: "later reply".into(),
             }),
@@ -377,6 +390,7 @@ fn inactive_polling_cursor_accepts_a_lower_new_sequence_after_restart() {
         .consume_update(
             900000000,
             Some(Reply {
+                locale: None,
                 chat_id: "123456789".into(),
                 text: "old result".into(),
             }),
@@ -390,6 +404,7 @@ fn inactive_polling_cursor_accepts_a_lower_new_sequence_after_restart() {
     assert_eq!(store.health(1000 + 2 * 86400).unwrap().pending, 1);
     let reply = || {
         Some(Reply {
+            locale: None,
             chat_id: "123456789".into(),
             text: "new result".into(),
         })
@@ -413,6 +428,7 @@ fn a_new_sequence_can_reuse_an_update_id_without_reusing_an_old_delivery() {
         .consume_update(
             42,
             Some(Reply {
+                locale: None,
                 chat_id: "123456789".into(),
                 text: "original intent".into(),
             }),
@@ -424,6 +440,7 @@ fn a_new_sequence_can_reuse_an_update_id_without_reusing_an_old_delivery() {
         .consume_update(
             42,
             Some(Reply {
+                locale: None,
                 chat_id: "123456789".into(),
                 text: "new intent".into(),
             }),
@@ -443,10 +460,12 @@ fn an_event_reaches_independent_recipients_and_pending_delivery_survives_restart
     let mut store = Store::open(dir.path(), event.server_id.as_str(), "123456789").unwrap();
     let replies = [
         Reply {
+            locale: None,
             chat_id: "123456789".into(),
             text: "first alert".into(),
         },
         Reply {
+            locale: None,
             chat_id: "987654321".into(),
             text: "second alert".into(),
         },

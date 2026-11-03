@@ -48,6 +48,10 @@ pub enum WireVersion {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
 #[serde(tag = "type", deny_unknown_fields)]
 pub enum Action {
+    #[serde(rename = "geoip.status")]
+    GeoIpStatus {},
+    #[serde(rename = "geoip.event")]
+    GeoIpEvent { event_id: Id },
     #[serde(rename = "server.status")]
     ServerStatus {},
     #[serde(rename = "fail2ban.status")]
@@ -118,3 +122,6 @@ pub use firewall::*;
 
 mod xui;
 pub use xui::*;
+
+mod geoip;
+pub use geoip::*;

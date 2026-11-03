@@ -1,0 +1,11 @@
+{
+  "version": "1",
+  "server_id": "server-demo",
+  "enabled": false,
+  "queued": 0,
+  "cache_entries": 0,
+  "requests_today": 0,
+  "skipped": 0,
+  "reason_key": "geoip_disabled",
+  "cooldown_until": null
+}
