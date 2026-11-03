@@ -119,3 +119,5 @@ Rules: [AGENTS.md](AGENTS.md). Engineering-skill configuration: [issue tracker](
 ## License / Лицензия
 
 [MIT](LICENSE).
+
+Мониторинг SSH и восстановление журналов: [документация](docs/ssh.md). / SSH monitoring and journal recovery: [documentation](docs/ssh.md).

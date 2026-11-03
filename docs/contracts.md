@@ -61,3 +61,9 @@ By explicit pre-release decision, this extends wire version "1" without a versio
 DeliveryHealth is a separate additive wire-version "1" DTO. It contains queue counts, oldest pending time, rate-limited recipient count, pruning count, and up to 20 DeliveryProblem entries. Problems carry stable string IDs, delivery state, attempt count, reason_key, uncertainty, and update time. Message contents, recipient IDs, and tokens are excluded. The daemon enforces response bounds; generated types provide no authorization. The existing server.status action and result are unchanged.
 
 DeliveryHealth добавлен отдельным DTO wire version "1". Он содержит счётчики очереди, время самой старой ожидающей доставки, число получателей на паузе, счётчик очистки и до 20 записей DeliveryProblem. Проблемы содержат стабильные строковые ID, состояние доставки, число попыток, reason_key, признак неоднозначности и время изменения. Тексты сообщений, ID получателей и токены исключены. Daemon ограничивает размер результата; производные типы не дают полномочий. Действие server.status и его результат сохраняют прежний формат.
+
+## SSH health
+
+`SshHealth` описывает доступность выбранного SSH-источника, начало покрытия, время успешной проверки, последнюю запись, неподдержанные записи и сохраняемые пропуски. Состояния: `starting`, `healthy`, `degraded`, `unavailable`. Контракт не содержит сырых журналов или токена.
+
+`SshHealth` describes selected-source availability, coverage start, successful check and record times, unsupported records, and persistent gaps. States are `starting`, `healthy`, `degraded`, and `unavailable`. It contains no raw journal or token.

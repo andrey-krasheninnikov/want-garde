@@ -1,5 +1,5 @@
 [Unit]
-Description=Want Garde host status
+Description=Want Garde host and SSH monitoring
 Wants=network-online.target
 After=network-online.target
 StartLimitIntervalSec=60
@@ -9,6 +9,7 @@ StartLimitBurst=3
 Type=simple
 User=want-garde
 Group=want-garde
+SupplementaryGroups=systemd-journal
 ExecStart=/usr/local/lib/want-garde/current/want-garde-daemon --config /etc/want-garde/config.json
 Restart=on-failure
 RestartPreventExitStatus=2

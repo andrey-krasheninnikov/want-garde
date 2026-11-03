@@ -97,3 +97,6 @@ mod status;
 pub use status::*;
 mod delivery;
 pub use delivery::*;
+
+mod ssh;
+pub use ssh::*;

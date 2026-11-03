@@ -44,6 +44,7 @@ async fn an_event_passes_real_policy_and_sqlite_before_transport_delivery() {
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         default_locale: "en".into(),
+        ssh: Default::default(),
     };
     let bot = Bot::new(config.clone()).unwrap();
     let database = Database::open(config).await.unwrap();
@@ -91,6 +92,7 @@ async fn delivery_diagnostics_enforce_owner_access_and_all_locales_survive_queue
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         default_locale: "en".into(),
+        ssh: Default::default(),
     };
     let mut bot = Bot::new(config.clone()).unwrap();
     let database = Database::open(config.clone()).await.unwrap();
@@ -216,6 +218,7 @@ async fn a_slow_recipient_does_not_hold_delivery_to_another_recipient() {
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         default_locale: "en".into(),
+        ssh: Default::default(),
     };
     let database = Database::open(config).await.unwrap();
     let event: Event =
@@ -269,6 +272,7 @@ async fn a_fresh_status_command_after_an_idle_restart_reaches_the_outbox() {
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         default_locale: "en".into(),
+        ssh: Default::default(),
     };
     let old = garde_daemon::runtime::now() - 7 * 86400;
     let mut store =
@@ -298,4 +302,139 @@ async fn a_fresh_status_command_after_an_idle_restart_reaches_the_outbox() {
         .unwrap();
     assert!(delivery.reply.text.contains("Server status"));
     assert!(delivery.reply.text.contains("ID: d-1"));
+}
+
+#[tokio::test]
+async fn ssh_diagnostics_and_events_use_current_owner_language_and_deny_other_chats() {
+    use garde_config::SshConfig;
+    use garde_daemon::ssh::Collector;
+    use std::io::Write;
+    let dir = tempfile::tempdir().unwrap();
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let log = dir.path().join("auth.log");
+    fs::write(&log, "").unwrap();
+    let config = Config {
+        server_id: Id::new("server-demo").unwrap(),
+        owner_user_id: Some("123456789".into()),
+        bot_token_file: dir.path().join("token"),
+        state_dir: dir.path().into(),
+        default_locale: "en".into(),
+        ssh: SshConfig::File { path: log.clone() },
+    };
+    let database = Database::open(config.clone()).await.unwrap();
+    let mut bot = Bot::new(config.clone()).unwrap();
+    let mut collector = Collector::new(config, database.clone());
+    collector.scan().await.unwrap();
+    for (id, user, chat) in [(0, 987654321, "private"), (1, 123456789, "group")] {
+        let update = json!({"update_id":id,"message":{"from":{"id":user,"is_bot":false},"chat":{"id":user,"type":chat},"text":"/ssh"}});
+        bot.process_update(&database, &update, &Host, "test_bot")
+            .await
+            .unwrap();
+    }
+    assert_eq!(database.call(|s| s.health(1000)).await.unwrap().pending, 0);
+    let update = |id, text: String| json!({"update_id":id,"message":{"from":{"id":123456789,"is_bot":false},"chat":{"id":123456789,"type":"private"},"text":text}});
+    let mut id = 2;
+    for (locale, copy) in garde_entrypoint::catalog()["locales"].as_object().unwrap() {
+        for text in [format!("/language {locale}"), "/ssh".into()] {
+            bot.process_update(&database, &update(id, text.clone()), &Host, "test_bot")
+                .await
+                .unwrap();
+            id += 1;
+            let delivery = database
+                .call(|s| s.claim(garde_daemon::runtime::now()))
+                .await
+                .unwrap()
+                .unwrap();
+            if text == "/ssh" {
+                assert!(
+                    delivery
+                        .reply
+                        .text
+                        .starts_with(copy["ssh_title"].as_str().unwrap())
+                );
+                assert!(delivery.reply.text.contains("\u{2068}server-demo\u{2069}"));
+            }
+            database
+                .call(move |s| {
+                    s.finish(
+                        delivery.id,
+                        garde_daemon::delivery::Outcome::Delivered,
+                        garde_daemon::runtime::now(),
+                    )
+                })
+                .await
+                .unwrap();
+        }
+        writeln!(
+            fs::OpenOptions::new().append(true).open(&log).unwrap(),
+            "sshd[1]: Accepted publickey for locale-{id} from 2001:db8::1 port 2222 ssh2"
+        )
+        .unwrap();
+        collector.scan().await.unwrap();
+        let delivery = database
+            .call(|s| s.claim(garde_daemon::runtime::now()))
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            delivery
+                .reply
+                .text
+                .contains(copy["ssh_login"].as_str().unwrap())
+        );
+        assert!(!delivery.reply.text.contains("message.unavailable"));
+        database
+            .call(move |s| {
+                s.finish(
+                    delivery.id,
+                    garde_daemon::delivery::Outcome::Delivered,
+                    garde_daemon::runtime::now(),
+                )
+            })
+            .await
+            .unwrap();
+    }
+}
+
+#[tokio::test]
+async fn an_ssh_file_record_reaches_transport_through_the_durable_queue() {
+    use garde_config::SshConfig;
+    use garde_daemon::ssh::Collector;
+    let dir = tempfile::tempdir().unwrap();
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let log = dir.path().join("auth.log");
+    fs::write(&log, "").unwrap();
+    let config = Config {
+        server_id: Id::new("server-demo").unwrap(),
+        owner_user_id: Some("123456789".into()),
+        bot_token_file: dir.path().join("token"),
+        state_dir: dir.path().into(),
+        default_locale: "en".into(),
+        ssh: SshConfig::File { path: log.clone() },
+    };
+    let database = Database::open(config.clone()).await.unwrap();
+    let mut collector = Collector::new(config, database.clone());
+    collector.scan().await.unwrap();
+    fs::write(
+        &log,
+        "sshd[1]: Accepted publickey for alice from 2001:db8::1 port 2222 ssh2\n",
+    )
+    .unwrap();
+    collector.scan().await.unwrap();
+    let transport = Arc::new(Telegram::default());
+    let sender = tokio::spawn(send_loop(database.clone(), transport.clone()));
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while database.call(|s| s.health(1000)).await.unwrap().delivered != 1 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    sender.abort();
+    let _ = sender.await;
+    let messages = transport.messages.lock().unwrap();
+    assert_eq!(messages.len(), 1);
+    assert!(messages[0].contains("SSH login accepted"));
+    assert!(messages[0].contains("alice"));
+    assert!(messages[0].contains("Event: ssh:"));
 }

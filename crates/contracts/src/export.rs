@@ -19,6 +19,8 @@ pub fn contract_artifacts() -> Result<BTreeMap<&'static str, String>, serde_json
     schema!("host-snapshot.schema.json", HostSnapshot);
     schema!("delivery-health.schema.json", DeliveryHealth);
 
+    schema!("ssh-health.schema.json", SshHealth);
+
     let mut types = format!(
         "export const PRODUCT_VERSION = {:?} as const;\nexport const CONTRACT_VERSION = \"1\" as const;\n",
         PRODUCT_VERSION
@@ -50,6 +52,9 @@ pub fn contract_artifacts() -> Result<BTreeMap<&'static str, String>, serde_json
         DeliveryState,
         DeliveryProblem,
         DeliveryHealth,
+        SshSourceKind,
+        SshStatus,
+        SshHealth,
         OperationResult,
         JobState,
         Job,

@@ -8,6 +8,7 @@ use std::{fs, future::Future, path::PathBuf};
 pub mod delivery;
 pub mod host;
 pub mod runtime;
+pub mod ssh;
 pub mod telegram;
 
 pub trait StatusSource {
@@ -156,6 +157,18 @@ impl Bot {
                 chat_id: self.config.owner()?.into(),
                 text: render_delivery(&health, &self.locale),
             })
+        } else if self
+            .command(update, username)
+            .is_some_and(|(command, args)| command == "/ssh" && args.is_empty())
+        {
+            let config = self.config.clone();
+            let health = database
+                .call(move |store| store.ssh_health(&config, runtime::now()))
+                .await?;
+            Some(Reply {
+                chat_id: self.config.owner()?.into(),
+                text: render_ssh(&health, &self.locale),
+            })
         } else {
             match self.handle(update, source, username).await {
                 Ok(reply) => reply,
@@ -178,6 +191,13 @@ impl Bot {
         database: &runtime::Database,
         event: garde_contracts::Event,
     ) -> Result<()> {
+        let replies = self.event_replies(&event)?;
+        database
+            .call(move |store| store.publish(&event, &replies, runtime::now()))
+            .await
+    }
+
+    pub(crate) fn event_replies(&self, event: &garde_contracts::Event) -> Result<Vec<Reply>> {
         let reason = message(&self.locale, event.classification.reason_key.as_str());
         let reason = if reason == "message.unavailable" {
             event.classification.reason_key.as_str()
@@ -194,7 +214,13 @@ impl Bot {
         for evidence in event.evidence.iter().take(8) {
             text.push_str(&format!(
                 "\n{}: {}",
-                isolate(evidence.name.as_str()),
+                isolate(
+                    if message(&self.locale, evidence.name.as_str()) == "message.unavailable" {
+                        evidence.name.as_str()
+                    } else {
+                        message(&self.locale, evidence.name.as_str())
+                    }
+                ),
                 isolate(&evidence.value)
             ));
         }
@@ -202,10 +228,61 @@ impl Bot {
             chat_id: self.config.owner()?.into(),
             text,
         }];
-        database
-            .call(move |store| store.publish(&event, &replies, runtime::now()))
-            .await
+        Ok(replies)
     }
+}
+
+fn render_ssh(health: &garde_contracts::SshHealth, locale: &str) -> String {
+    use garde_contracts::{SshSourceKind, SshStatus};
+    let state = match health.state {
+        SshStatus::Starting => "ssh_starting",
+        SshStatus::Healthy => "ssh_healthy",
+        SshStatus::Degraded => "ssh_degraded",
+        SshStatus::Unavailable => "ssh_unavailable",
+    };
+    let source = match health.source {
+        SshSourceKind::Unselected => "?",
+        SshSourceKind::Journald => "journald",
+        SshSourceKind::File => "file",
+    };
+    let mut lines = vec![
+        format!(
+            "{}: {}",
+            message(locale, "ssh_title"),
+            isolate(health.server_id.as_str())
+        ),
+        format!("{}: {}", message(locale, "ssh_source"), isolate(source)),
+        message(locale, state).into(),
+        message(locale, "ssh_first_run").into(),
+    ];
+    for (key, at) in [
+        ("ssh_coverage", health.coverage_started_at),
+        ("ssh_checked", health.checked_at),
+        ("ssh_last_record", health.last_record_at),
+    ] {
+        lines.push(format!(
+            "{}: {}",
+            message(locale, key),
+            isolate(&at.map(|t| t.to_rfc3339()).unwrap_or_else(|| "?".into()))
+        ));
+    }
+    lines.push(format!(
+        "{}: {}",
+        message(locale, "ssh_skipped"),
+        isolate(&health.skipped_records.to_string())
+    ));
+    lines.push(format!(
+        "{}: {}",
+        message(locale, "ssh_gaps"),
+        isolate(&health.gap_count.to_string())
+    ));
+    for code in [health.reason_key.as_ref(), health.last_gap.as_ref()]
+        .into_iter()
+        .flatten()
+    {
+        lines.push(isolate(code.as_str()));
+    }
+    lines.join("\n")
 }
 
 fn render_delivery(health: &garde_contracts::DeliveryHealth, locale: &str) -> String {

@@ -9,6 +9,7 @@ fn delivery_diagnostics_are_read_only_json_and_work_without_a_token() {
         bot_token_file: dir.path().join("absent-token"),
         state_dir: dir.path().into(),
         default_locale: "en".into(),
+        ssh: Default::default(),
         owner_user_id: Some("123456789".into()),
     };
     let path = dir.path().join("config.json");

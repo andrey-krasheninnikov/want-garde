@@ -70,6 +70,10 @@ fn schemas_match_valid_examples_and_reject_the_negative_request_corpus() {
             "host-snapshot",
             include_str!("../../../fixtures/contracts/host-snapshot.json"),
         ),
+        (
+            "ssh-health",
+            include_str!("../../../fixtures/contracts/ssh-health.json"),
+        ),
     ] {
         let schema: serde_json::Value = serde_json::from_str(
             &fs::read_to_string(directory.path().join(format!("{schema_name}.schema.json")))

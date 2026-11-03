@@ -89,3 +89,9 @@ The daemon has no root, capabilities, sudo, or Docker-socket access. Configurati
 Polling network failures use a 1..30-second backoff and respect Telegram retry_after. Invalid tokens, webhooks, and polling conflicts stop the process. Events, replies, and polling progress are persisted in SQLite before sending. An ambiguous send can repeat with the same ID. Events expire after 24 hours; replies after 10 minutes. See [delivery, diagnostics, and limitations](delivery.md).
 
 To roll back a failed first installation, stop and disable only `want-garde.service`, retaining configuration and token for correction. Before later manual updates, preserve the previous SHA/files, stop the service, switch `current` to a verified build, and check startup. Future data compatibility and automatic rollback require their implementation issues. Helper and MCP remain scaffolds in #3.
+
+## SSH
+
+Служба получает чтение системного journal через `SupplementaryGroups=systemd-journal`; это доступ ко всем системным журналам. Первый запуск принимает только новые записи. Режимы, восстановление и `/ssh` описаны в [мониторинге SSH](ssh.md).
+
+The service reads the system journal through `SupplementaryGroups=systemd-journal`, granting access to all system journals. The first run starts with new records. See [SSH monitoring](ssh.md) for modes, recovery, and `/ssh`.
