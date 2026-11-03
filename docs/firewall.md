@@ -11,7 +11,7 @@ Want Garde сохраняет fail2ban Ban, Restore Ban и Unban, UFW BLOCK, с�
 `/bans` также показывает здоровье обоих источников, пропуски, неподдержанные/повреждённые записи и стабильные reason keys. Локальная команда запускается от want-garde, не читает token и не меняет базу:
 
 ```sh
-sudo -u want-garde want-garde-daemon --firewall-status --config /etc/want-garde/config.json
+sudo -u want-garde /usr/local/lib/want-garde/current/want-garde-daemon --firewall-status --config /etc/want-garde/config.json
 ```
 
 JSON использует состояния starting, healthy, degraded и unavailable. Exit codes: 0 — оба источника healthy, 1 — неполное или недоступное покрытие, 2 — ошибка конфигурации/базы/диагностики. Исправный reader не доказывает эффективность firewall или полноту всех сетевых блокировок: logging и rate limits источника ограничивают наблюдения.
@@ -84,7 +84,7 @@ Want Garde persists fail2ban Ban, Restore Ban and Unban, UFW BLOCK, standard fir
 
 The owner can use `/bans`, `/bans --page 2`, and `/bans sshd 2` in a private chat. A summary page contains up to 10 jails; a jail page contains up to 20 IPs. Snapshots include collection time, current counts and an explicit partial flag. Partial or unavailable data never means zero bans. Groups, unknown users and callbacks do not invoke the helper. Unban belongs to #16.
 
-`/bans` also exposes both sources, gaps, unsupported/malformed records and stable reason keys. Run `want-garde-daemon --firewall-status --config /etc/want-garde/config.json` as want-garde (for example with `sudo -u want-garde`); it reads JSON without the token or database writes. Exit codes are 0 for both sources healthy, 1 for incomplete/unavailable coverage, and 2 for configuration/database/diagnostic errors. A healthy reader proves neither firewall effectiveness nor observation of every blocked packet; source logging and rate limits constrain coverage.
+`/bans` also exposes both sources, gaps, unsupported/malformed records and stable reason keys. Run `/usr/local/lib/want-garde/current/want-garde-daemon --firewall-status --config /etc/want-garde/config.json` as want-garde (for example with `sudo -u want-garde`); it reads JSON without the token or database writes. Exit codes are 0 for both sources healthy, 1 for incomplete/unavailable coverage, and 2 for configuration/database/diagnostic errors. A healthy reader proves neither firewall effectiveness nor observation of every blocked packet; source logging and rate limits constrain coverage.
 
 ### Sources and recovery
 
@@ -114,9 +114,9 @@ For rollback, stop the new daemon and installation-owned helper socket/instances
 
 ## Platform evidence / Проверка платформ
 
-| Platform / Платформа                                   | Source / Источник                          | Evidence / Доказательства                                                                                                                    |
-| ------------------------------------------------------ | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ubuntu 24.04 x86_64                                    | fail2ban, UFW                              | Native verification pending / Native-проверка ожидается                                                                                      |
-| Ubuntu 24.04 x86_64                                    | nftables                                   | Synthetic packet fixtures; no live ruleset claim / Синтетические записи, без заявления о проверке действующих правил                         |
-| firewalld                                              | Standard log formats / Стандартные форматы | Synthetic fixtures only; firewalld is absent on the current test host / Только синтетические примеры; на текущем хосте firewalld отсутствует |
-| Debian, Rocky/AlmaLinux, Fedora, Arch, openSUSE; ARM64 | Planned / Планируется                      | Unverified; #32 / Не проверено; #32                                                                                                          |
+| Platform / Платформа                                   | Source / Источник                          | Evidence / Доказательства                                                                                                                                                                                                                                          |
+| ------------------------------------------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Ubuntu 24.04 x86_64                                    | fail2ban, UFW                              | Native systemd: auto sources, read helper/UID denial, adm access, offline/restart and SIGKILL; synthetic ban/unban/block records / Native systemd: auto-источники, helper/отказ по UID, права adm, offline/restart и SIGKILL; синтетические записи ban/unban/block |
+| Ubuntu 24.04 x86_64                                    | nftables                                   | Synthetic packet fixtures; no live ruleset claim / Синтетические записи, без заявления о проверке действующих правил                                                                                                                                               |
+| firewalld                                              | Standard log formats / Стандартные форматы | Synthetic fixtures only; firewalld is absent on the current test host / Только синтетические примеры; на текущем хосте firewalld отсутствует                                                                                                                       |
+| Debian, Rocky/AlmaLinux, Fedora, Arch, openSUSE; ARM64 | Planned / Планируется                      | Unverified; #32 / Не проверено; #32                                                                                                                                                                                                                                |
