@@ -98,12 +98,33 @@ async fn cold_lookup_is_saved_without_changing_delivery_and_later_events_use_cac
         .unwrap();
     assert_eq!(count.in_flight, 1);
     assert_eq!(count.pending, 0);
+    let at = garde_daemon::runtime::now();
+    database
+        .call(move |s| {
+            s.finish(
+                delivery.id,
+                garde_daemon::delivery::Outcome::Retry {
+                    code: "telegram.network",
+                    retry_after: 0,
+                    uncertain: false,
+                },
+                at,
+            )
+        })
+        .await
+        .unwrap();
+    let retry = database
+        .call(move |s| s.claim(at + 5))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(retry.reply.text, original);
     bot.publish_event(&database, event("geo-warm", "8.8.8.8"))
         .await
         .unwrap();
     let context = database.call(|s| s.geoip_event("geo-warm")).await.unwrap();
     assert_eq!(context.state, garde_contracts::GeoIpState::Cached);
-    assert_eq!(delivery.reply.text, original);
+
     assert!(
         !garde_daemon::geoip::run_once(&database, &Provider, garde_daemon::runtime::now() + 2)
             .await
@@ -616,4 +637,65 @@ async fn context_keeps_the_same_locale_as_its_notification_when_preferences_chan
         .unwrap();
     assert!(delivery.reply.text.contains("GeoIP: disabled"));
     assert!(!delivery.reply.text.contains("выключено"));
+}
+
+#[derive(Default)]
+struct CapturedTelegram(std::sync::Mutex<Vec<String>>);
+impl garde_daemon::runtime::Transport for CapturedTelegram {
+    async fn identity(
+        &self,
+    ) -> Result<garde_daemon::runtime::Identity, garde_daemon::telegram::TransportError> {
+        std::future::pending().await
+    }
+    async fn updates(
+        &self,
+        _: i64,
+    ) -> Result<Vec<serde_json::Value>, garde_daemon::telegram::TransportError> {
+        std::future::pending().await
+    }
+    async fn send(
+        &self,
+        reply: &garde_daemon::Reply,
+    ) -> Result<(), garde_daemon::telegram::TransportError> {
+        self.0.lock().unwrap().push(reply.text.clone());
+        Ok(())
+    }
+}
+#[tokio::test]
+async fn critical_event_reaches_telegram_transport_while_geoip_provider_is_still_waiting() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let mut config = configuration(dir.path());
+    config.geoip.enabled = true;
+    config.geoip.token_file = Some(dir.path().join("geo-token"));
+    let bot = Bot::new(config.clone()).unwrap();
+    let database = Database::open(config).await.unwrap();
+    let mut event = event("critical-transport", "8.8.8.8");
+    event.classification.severity = garde_contracts::Severity::Critical;
+    bot.publish_event(&database, event).await.unwrap();
+    let worker_database = database.clone();
+    let worker = tokio::spawn(async move {
+        garde_daemon::geoip::run_once(&worker_database, &Never, garde_daemon::runtime::now()).await
+    });
+    let transport = std::sync::Arc::new(CapturedTelegram::default());
+    let sender = tokio::spawn(garde_daemon::runtime::send_loop(
+        database.clone(),
+        transport.clone(),
+    ));
+    let observed = tokio::time::timeout(std::time::Duration::from_secs(1), async {
+        loop {
+            if let Some(text) = transport.0.lock().unwrap().first().cloned() {
+                break text;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        }
+    })
+    .await;
+    sender.abort();
+    worker.abort();
+    let _ = sender.await;
+    let _ = worker.await;
+    let text = observed.unwrap();
+    assert!(text.contains("critical-transport"));
+    assert!(text.contains("lookup pending"));
 }
