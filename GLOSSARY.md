@@ -110,3 +110,7 @@ _Avoid_: Последний снимок / Latest snapshot.
 **Panel snapshot / Снимок панели**
 
 Нормализованное наблюдение конфигурации x-ui/3x-ui и метаданных клиентов с fingerprints конфигурационных значений и явной доступностью данных. / A normalized observation of x-ui/3x-ui configuration and client metadata, with configuration fingerprints and explicit data availability.
+
+**GeoIP context / Контекст GeoIP**
+
+Необязательные приблизительные сведения о публичном IP источника: код страны, ASN и организация, с состоянием и временем получения. Контекст не изменяет исходное событие или его классификацию. / Optional approximate country code, ASN and organization for a public source IP, with retrieval state and time. Context never changes the original event or its classification.

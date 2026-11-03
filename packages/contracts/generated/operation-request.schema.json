@@ -31,6 +31,36 @@
           "properties": {
             "type": {
               "type": "string",
+              "const": "geoip.status"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event_id": {
+              "$ref": "#/$defs/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "geoip.event"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "event_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
               "const": "server.status"
             }
           },

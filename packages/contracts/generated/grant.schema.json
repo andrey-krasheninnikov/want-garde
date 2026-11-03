@@ -30,6 +30,7 @@
     "Capability": {
       "type": "string",
       "enum": [
+        "geoip.read",
         "status.read",
         "bans.read",
         "services.read",

@@ -80,3 +80,7 @@ Astro 7 может оставить preview в фоне. Остановите pr
 The #3 TDD seams are Telegram update to reply/denial and process startup to diagnostics/exit. Tests replace external host/Telegram sources and use temporary private files. Real Linux systemd/permissions acceptance is separate from native macOS tests.
 
 Seams TDD в #3: Telegram update с ответом/отказом и запуск процесса с диагностикой/завершением. Tests подменяют внешние источники хоста/Telegram и используют временные закрытые файлы. Linux-проверка systemd/прав учитывается отдельно от native macOS tests.
+
+The #10 TDD seams cover an IP event through real temporary SQLite to Telegram transport, the GeoIP HTTP provider, and public diagnostics/access denials. Tests use synthetic addresses and responses; real provider acceptance requires a separately configured token.
+
+Seams TDD в #10 покрывают IP-событие через настоящий временный SQLite до Telegram transport, HTTP-провайдер GeoIP и публичные диагностики/отказы доступа. Tests используют синтетические адреса и ответы; реальная проверка провайдера требует отдельно настроенного token.

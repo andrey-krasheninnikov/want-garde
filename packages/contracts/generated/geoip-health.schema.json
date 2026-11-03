@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GeoIpHealth",
+  "type": "object",
+  "properties": {
+    "cache_entries": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "cooldown_until": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "queued": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "reason_key": {
+      "$ref": "#/$defs/Id"
+    },
+    "requests_today": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "server_id": {
+      "$ref": "#/$defs/Id"
+    },
+    "skipped": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "version": {
+      "$ref": "#/$defs/WireVersion"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "server_id",
+    "enabled",
+    "queued",
+    "cache_entries",
+    "requests_today",
+    "skipped",
+    "reason_key"
+  ],
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "WireVersion": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    }
+  }
+}

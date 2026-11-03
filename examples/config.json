@@ -20,5 +20,9 @@
     "interval_seconds": 30,
     "client_disconnect_after_seconds": 180,
     "helper_socket": "/run/want-garde-xui.sock"
+  },
+  "geoip": {
+    "enabled": false,
+    "token_file": null
   }
 }

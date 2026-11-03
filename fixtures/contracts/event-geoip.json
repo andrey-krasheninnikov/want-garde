@@ -1,0 +1,15 @@
+{
+  "version": "1",
+  "server_id": "server-demo",
+  "event_id": "event-001",
+  "ip": "8.8.8.8",
+  "state": "retrieved",
+  "reason_key": "geoip_retrieved",
+  "provider": "ipinfo_lite",
+  "fetched_at": "2026-11-03T00:00:00Z",
+  "details": {
+    "country_code": "US",
+    "asn": 15169,
+    "organization": "Example network"
+  }
+}

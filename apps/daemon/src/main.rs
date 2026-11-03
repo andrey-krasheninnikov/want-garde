@@ -32,9 +32,18 @@ async fn run() -> ExitCode {
     if args == ["--version"] {
         return garde_entrypoint::run("want-garde-daemon");
     }
+    match args {
+        [flag, config, path] if flag == "--geoip-status" && config == "--config" => {
+            return geoip_command(Path::new(path), None);
+        }
+        [flag, id, config, path] if flag == "--geoip-event" && config == "--config" => {
+            return geoip_command(Path::new(path), Some(id));
+        }
+        _ => {}
+    }
     if args == ["--help"] {
         println!(
-            "{}: want-garde-daemon [--lang LOCALE] [--check-config | --delivery-status | --ssh-status | --firewall-status | --host-status | --services-status | --ports-status | --xui-status | --ports-baseline-preview | --ports-baseline-accept HASH] --config PATH",
+            "{}: want-garde-daemon [--lang LOCALE] [--check-config | --delivery-status | --ssh-status | --firewall-status | --host-status | --services-status | --ports-status | --xui-status | --geoip-status | --geoip-event EVENT_ID | --ports-baseline-preview | --ports-baseline-accept HASH] --config PATH",
             message(locale, "usage")
         );
         return ExitCode::SUCCESS;
@@ -311,6 +320,35 @@ async fn monitoring_command(flag: &str, hash: Option<&str>, path: &Path) -> Exit
             } else {
                 ExitCode::from(1)
             }
+        }
+        Err(code) => diagnostic_error(code),
+    }
+}
+
+fn geoip_command(path: &Path, event: Option<&str>) -> ExitCode {
+    let config = match Config::load(path) {
+        Ok(config) => config,
+        Err(code) => return diagnostic_error(code),
+    };
+    let result = if let Some(event) = event {
+        garde_daemon::delivery::Store::inspect_geoip_event(&config, event).and_then(|context| {
+            serde_json::to_string(&context)
+                .map(|json| (json, false))
+                .map_err(|_| "geoip.state")
+        })
+    } else {
+        garde_daemon::delivery::Store::inspect_geoip(&config, garde_daemon::runtime::now())
+            .and_then(|health| {
+                let attention = health.enabled && health.reason_key.as_str() != "geoip_ready";
+                serde_json::to_string(&health)
+                    .map(|json| (json, attention))
+                    .map_err(|_| "geoip.state")
+            })
+    };
+    match result {
+        Ok((json, attention)) => {
+            println!("{json}");
+            ExitCode::from(u8::from(attention))
         }
         Err(code) => diagnostic_error(code),
     }

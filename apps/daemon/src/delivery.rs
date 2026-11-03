@@ -11,7 +11,8 @@ use std::{
 };
 
 pub struct Store {
-    connection: Connection,
+    pub(crate) connection: Connection,
+    pub(crate) geoip_config: Option<garde_config::Config>,
     _lock: File,
 }
 pub struct Delivery {
@@ -32,7 +33,7 @@ pub enum Outcome {
     },
 }
 
-fn sql<T>(value: rusqlite::Result<T>) -> Result<T> {
+pub(crate) fn sql<T>(value: rusqlite::Result<T>) -> Result<T> {
     value.map_err(|error| match error.sqlite_error_code() {
         Some(rusqlite::ErrorCode::DiskFull) => "storage.full",
         Some(rusqlite::ErrorCode::DatabaseBusy | rusqlite::ErrorCode::DatabaseLocked) => {
@@ -206,7 +207,9 @@ impl Store {
             crate::ssh::State::decode(&saved)?;
         }
         sql(connection.execute("UPDATE deliveries SET state='pending',uncertain=1,last_error='delivery.uncertain' WHERE state='in_flight'",[]))?;
+        crate::geoip::initialize(&connection)?;
         Ok(Self {
+            geoip_config: None,
             connection,
             _lock: lock,
         })
@@ -397,16 +400,13 @@ impl Store {
             "INSERT INTO events VALUES(?1,?2,?3)",
             params![event.id.as_str(), payload, now],
         ))?;
-        for reply in replies {
-            enqueue(
-                &transaction,
-                Some(event.id.as_str()),
-                None,
-                reply,
-                now,
-                86400,
-            )?;
-        }
+        enqueue_event(
+            &transaction,
+            event,
+            replies,
+            self.geoip_config.as_ref(),
+            now,
+        )?;
         if let Some(checkpoint) = checkpoint {
             sql(transaction.execute("INSERT INTO meta VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",params![kind.key(),checkpoint]))?;
         }
@@ -580,16 +580,13 @@ impl Store {
                 "INSERT INTO events VALUES(?1,?2,?3)",
                 params![event.id.as_str(), payload, now],
             ))?;
-            for reply in replies {
-                enqueue(
-                    &transaction,
-                    Some(event.id.as_str()),
-                    None,
-                    reply,
-                    now,
-                    86400,
-                )?;
-            }
+            enqueue_event(
+                &transaction,
+                event,
+                replies,
+                self.geoip_config.as_ref(),
+                now,
+            )?;
         }
         sql(transaction.execute(
             "INSERT INTO meta VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
@@ -625,7 +622,7 @@ impl Store {
         self.maintenance(now)?;
         let transaction = sql(self.connection.transaction())?;
         sql(transaction.execute("UPDATE deliveries SET state='dead_letter',last_error=CASE WHEN expires_at<=?1 THEN 'delivery.expired' ELSE 'delivery.exhausted' END,updated_at=?1 WHERE id IN (SELECT id FROM deliveries WHERE state='pending' AND (expires_at<=?1 OR attempts>=128) LIMIT 100)",[now]))?;
-        let value = sql(transaction.query_row("SELECT id,chat_id,text,attempts FROM deliveries d WHERE state='pending' AND next_at<=?1 AND expires_at>?1 AND attempts<128 AND NOT EXISTS(SELECT 1 FROM deliveries a WHERE a.chat_id=d.chat_id AND a.state='in_flight') AND NOT EXISTS(SELECT 1 FROM cooldowns c WHERE c.chat_id=d.chat_id AND c.until_at>?1) ORDER BY next_at,id LIMIT 1",[now],|r| Ok(Delivery { id:r.get(0)?, reply:Reply { chat_id:r.get(1)?, text:r.get(2)? },attempts:r.get::<_,u32>(3)?+1 })).optional())?;
+        let value = sql(transaction.query_row("SELECT id,chat_id,text,attempts FROM deliveries d WHERE state='pending' AND next_at<=?1 AND expires_at>?1 AND attempts<128 AND NOT EXISTS(SELECT 1 FROM deliveries a WHERE a.chat_id=d.chat_id AND a.state='in_flight') AND NOT EXISTS(SELECT 1 FROM cooldowns c WHERE c.chat_id=d.chat_id AND c.until_at>?1) ORDER BY next_at,id LIMIT 1",[now],|r| Ok(Delivery { id:r.get(0)?, reply:Reply { locale: None, chat_id:r.get(1)?, text:r.get(2)? },attempts:r.get::<_,u32>(3)?+1 })).optional())?;
         if let Some(value) = &value {
             sql(transaction.execute("UPDATE deliveries SET state='in_flight',attempts=attempts+1,updated_at=?1,next_at=?3 WHERE id=?2",params![now,value.id,now.saturating_add(backoff(value.attempts) as i64)]))?;
         }
@@ -769,7 +766,11 @@ impl Store {
     }
 }
 
-fn inspect_connection(directory: &Path, server: &str, owner: &str) -> Result<Connection> {
+pub(crate) fn inspect_connection(
+    directory: &Path,
+    server: &str,
+    owner: &str,
+) -> Result<Connection> {
     self::directory(directory)?;
     let path = directory
         .canonicalize()
@@ -932,6 +933,47 @@ fn backoff(attempt: u32) -> u64 {
     (5u64 << attempt.saturating_sub(1).min(8)).min(900)
 }
 
+fn enqueue_event(
+    transaction: &rusqlite::Transaction<'_>,
+    event: &Event,
+    replies: &[Reply],
+    config: Option<&garde_config::Config>,
+    now: i64,
+) -> Result<()> {
+    let context = crate::geoip::record(transaction, event, config, now)?;
+    for reply in replies {
+        let enriched;
+        let reply = if let Some(context) = &context {
+            let locale = reply
+                .locale
+                .as_deref()
+                .or_else(|| config.map(|c| c.default_locale.as_str()))
+                .unwrap_or("en");
+            enriched = Reply {
+                locale: None,
+                chat_id: reply.chat_id.clone(),
+                text: format!(
+                    "{}\n{}",
+                    reply.text,
+                    crate::geoip::render_context(context, locale)
+                ),
+            };
+            &enriched
+        } else {
+            reply
+        };
+        enqueue(
+            transaction,
+            Some(event.id.as_str()),
+            None,
+            reply,
+            now,
+            86400,
+        )?;
+    }
+    Ok(())
+}
+
 fn enqueue(
     transaction: &rusqlite::Transaction<'_>,
     event: Option<&str>,
@@ -983,6 +1025,7 @@ mod tests {
             let result = store.consume_update(
                 id,
                 Some(Reply {
+                    locale: None,
                     chat_id: "123456789".into(),
                     text: "x".repeat(3800),
                 }),
@@ -1012,6 +1055,7 @@ mod tests {
                 .consume_update(
                     id,
                     Some(Reply {
+                        locale: None,
                         chat_id: "123456789".into(),
                         text: "quota".into(),
                     }),
@@ -1023,6 +1067,7 @@ mod tests {
             store.consume_update(
                 10000,
                 Some(Reply {
+                    locale: None,
                     chat_id: "123456789".into(),
                     text: "over quota".into()
                 }),

@@ -115,3 +115,7 @@ See [service, port and baseline monitoring](services-ports.md) for configuration
 ## x-ui/3x-ui
 
 См. [read-only мониторинг x-ui](xui.md): отдельный helper, root-owned политика и диагностика. / See [read-only x-ui monitoring](xui.md) for the separate helper, root-owned policy, and diagnostics.
+
+## Optional GeoIP / Необязательный GeoIP
+
+GeoIP включается отдельно после настройки IPinfo token. Перед включением прочитайте [передаваемые данные, лимиты и диагностику](geoip.md). / Enable GeoIP separately after configuring an IPinfo token. Read [data disclosure, limits and diagnostics](geoip.md) before enabling it.
