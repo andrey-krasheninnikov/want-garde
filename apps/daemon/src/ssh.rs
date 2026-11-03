@@ -318,23 +318,18 @@ impl<J: JournalSource> Collector<J> {
         let m = current.metadata().map_err(|_| "ssh.read")?;
         let identity = (m.dev(), m.ino());
         if !state.files.iter().any(|f| (f.device, f.inode) == identity) {
-            state.sequence = state.sequence.checked_add(1).ok_or("ssh.state")?;
             let initial = state.started_at.is_none();
-            if state.files.len() == 4 {
-                let old = state.files.remove(0);
-                self.handles.remove(&(old.device, old.inode));
-                state.gap("ssh.rotation_limit");
+            if let Some(previous) = state.files.last() {
+                let (rotations, complete) =
+                    intermediate_rotations(&path, previous, state.checked_at)?;
+                if !complete {
+                    state.gap("ssh.rotation_order");
+                }
+                for file in rotations {
+                    self.register_file(state, file, false)?;
+                }
             }
-            let offset = if initial { m.len() } else { 0 };
-            state.files.push(FileCheckpoint {
-                device: m.dev(),
-                inode: m.ino(),
-                generation: state.sequence,
-                offset,
-                anchor: anchor(&current, offset)?,
-                discard: initial && offset > 0 && last_byte(&current, offset)? != b'\n',
-            });
-            self.handles.insert(identity, current);
+            self.register_file(state, current, initial)?;
             state.source = Some(SshConfig::File { path: path.clone() });
             state.checked_at = now();
             state.error = None;
@@ -451,6 +446,31 @@ impl<J: JournalSource> Collector<J> {
         }
         Ok(())
     }
+    fn register_file(&mut self, state: &mut State, file: File, initial: bool) -> Result<()> {
+        let m = file.metadata().map_err(|_| "ssh.read")?;
+        let identity = (m.dev(), m.ino());
+        if state.files.iter().any(|f| (f.device, f.inode) == identity) {
+            self.handles.insert(identity, file);
+            return Ok(());
+        }
+        state.sequence = state.sequence.checked_add(1).ok_or("ssh.state")?;
+        if state.files.len() == 4 {
+            let old = state.files.remove(0);
+            self.handles.remove(&(old.device, old.inode));
+            state.gap("ssh.rotation_limit");
+        }
+        let offset = if initial { m.len() } else { 0 };
+        state.files.push(FileCheckpoint {
+            device: m.dev(),
+            inode: m.ino(),
+            generation: state.sequence,
+            offset,
+            anchor: anchor(&file, offset)?,
+            discard: initial && offset > 0 && last_byte(&file, offset)? != b'\n',
+        });
+        self.handles.insert(identity, file);
+        Ok(())
+    }
     async fn commit(&self, state: State, event: Option<Event>) -> Result<()> {
         let checkpoint = serde_json::to_string(&state).map_err(|_| "ssh.state")?;
         let replies = match &event {
@@ -496,6 +516,64 @@ fn last_byte(file: &File, offset: u64) -> Result<u8> {
         .map_err(|_| "ssh.read")?;
     Ok(byte[0])
 }
+fn intermediate_rotations(
+    path: &Path,
+    previous: &FileCheckpoint,
+    since: i64,
+) -> Result<(Vec<File>, bool)> {
+    let parent = path.parent().ok_or("ssh.access")?;
+    let name = path.file_name().ok_or("ssh.access")?.to_string_lossy();
+    let mut entries = fs::read_dir(parent).map_err(|_| "ssh.access")?;
+    let mut files = Vec::new();
+    let mut previous_rank = None;
+    for entry in entries.by_ref().take(128) {
+        let entry = entry.map_err(|_| "ssh.read")?;
+        let candidate = entry.file_name();
+        let candidate = candidate.to_string_lossy();
+        let Some(suffix) = candidate.strip_prefix(name.as_ref()) else {
+            continue;
+        };
+        if !suffix.starts_with(['.', '-'])
+            || [".gz", ".xz", ".bz2", ".zst"]
+                .iter()
+                .any(|s| suffix.ends_with(s))
+        {
+            continue;
+        }
+        if let Ok(file) = open_log(&entry.path()) {
+            let m = file.metadata().map_err(|_| "ssh.read")?;
+            let rank = suffix
+                .strip_prefix('.')
+                .and_then(|s| s.parse::<u64>().ok())
+                .filter(|n| *n > 0);
+            if (m.dev(), m.ino()) == (previous.device, previous.inode) {
+                previous_rank = rank;
+            } else {
+                files.push((rank, m.mtime(), file));
+            }
+        }
+    }
+    let mut complete = entries.next().is_none();
+    if let Some(rank) = previous_rank {
+        files.retain(|(n, _, _)| n.is_some_and(|n| n < rank));
+        files.sort_by_key(|(n, _, _)| std::cmp::Reverse(*n));
+        complete &= files.len() as u64 == rank - 1
+            && files
+                .iter()
+                .enumerate()
+                .all(|(i, (n, _, _))| *n == Some(rank - 1 - i as u64));
+    } else {
+        // shortcut: unknown rotation order uses modification time, prefer numeric rotation for complete recovery.
+        complete = false;
+        files.retain(|(_, modified, _)| *modified >= since);
+        files.sort_by_key(|(_, modified, _)| *modified);
+    }
+    Ok((
+        files.into_iter().map(|(_, _, file)| file).collect(),
+        complete,
+    ))
+}
+
 fn find_rotation(path: &Path, identity: (u64, u64)) -> Result<Option<File>> {
     let parent = path.parent().ok_or("ssh.access")?;
     let name = path.file_name().ok_or("ssh.access")?.to_string_lossy();
@@ -503,7 +581,8 @@ fn find_rotation(path: &Path, identity: (u64, u64)) -> Result<Option<File>> {
         let entry = entry.map_err(|_| "ssh.read")?;
         let candidate = entry.file_name();
         let candidate = candidate.to_string_lossy();
-        if !candidate.starts_with(&format!("{name}."))
+        if !(candidate.starts_with(&format!("{name}."))
+            || candidate.starts_with(&format!("{name}-")))
             || [".gz", ".xz", ".bz2", ".zst"]
                 .iter()
                 .any(|s| candidate.ends_with(s))

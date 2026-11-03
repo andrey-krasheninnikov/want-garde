@@ -18,7 +18,7 @@ Want Garde читает SSH-события и сохраняет позицию 
 
 Journald cursor проверяется на точное совпадение. При его потере чтение продолжается с доступных записей около последнего сохранённого времени с перекрытием в одну секунду, но не раньше начала покрытия. Пропуск сохраняется в диагностике. Изменение системного времени может сделать восстановление неполным. При обычном чтении порядок задаёт cursor.
 
-Для файла сохраняются device, inode, поколение, byte offset и SHA-256 последних 64 байт перед позицией. Несжатая ротация ищется по inode. Открытые старые файлы продолжают читаться, включая поздние записи. Хранятся до четырёх поколений; поиск ограничен 129 записями каталога за проход. Нехватка сохранённых поколений или исчезновение старого inode фиксируется как пропуск.
+Для файла сохраняются device, inode, поколение, byte offset и SHA-256 последних 64 байт перед позицией. Несжатая ротация ищется по inode. При нескольких ротациях промежуточные файлы `.1`, `.2` и далее читаются по порядку, без чтения файлов старше сохранённого поколения. При неизвестном порядке доступны файлы с временем изменения не раньше последней проверки; это восстановление отмечается пропуском и может повторить старые записи. Открытые старые файлы продолжают читаться, включая поздние записи. Хранятся до четырёх поколений; поиск ограничен 129 записями каталога за проход. Нехватка сохранённых поколений или исчезновение старого inode фиксируется как пропуск.
 
 Truncate и несовпадение контрольного фрагмента начинают новое поколение с нуля. Copytruncate, удаление и сжатие файлов могут уничтожить непрочитанные данные. Восстановление этих данных не гарантируется. Пограничные случаи copytruncate без наблюдаемого изменения содержимого могут остаться неразличимыми для файлового чтения.
 
@@ -52,7 +52,7 @@ File mode requires read access to the file and rotations. The daemon changes no 
 
 The journal cursor is checked for an exact match. A missing cursor resumes available records around the last saved time with a one-second overlap, never before coverage began, and records a persistent gap. System-clock changes can make recovery incomplete. Normal ingestion follows the cursor.
 
-File progress stores device, inode, generation, byte offset, and SHA-256 of the preceding 64 bytes. Uncompressed rotations are located by inode. Open old files remain readable for late writes. At most four generations and 129 directory entries per search are handled. Missing generations or an unavailable old inode record a gap.
+File progress stores device, inode, generation, byte offset, and SHA-256 of the preceding 64 bytes. Uncompressed rotations are located by inode. After multiple rotations, intermediate files `.1`, `.2`, and so on are read in order, excluding files older than the saved generation. When the order is unknown, files modified since the last check are recovered with a visible gap; this recovery can replay older records. Open old files remain readable for late writes. At most four generations and 129 directory entries per search are handled. Missing generations or an unavailable old inode record a gap.
 
 Truncation or a changed anchor starts a generation at zero. Copytruncate, deletion, and compression can destroy unread data; recovery cannot guarantee it. Copytruncate cases without an observable content change can remain indistinguishable to a file reader.
 

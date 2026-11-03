@@ -147,6 +147,75 @@ async fn rotation_keeps_unread_and_late_old_file_records_across_restart() {
 }
 
 #[tokio::test]
+async fn restart_recovers_intermediate_rotations_and_reports_uncertain_coverage() {
+    for (numeric, middle) in [(true, true), (true, false), (false, true)] {
+        let dir = tempfile::tempdir().unwrap();
+        fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let log = dir.path().join("auth.log");
+        let record =
+            |user| format!("sshd[1]: Accepted password for {user} from 192.0.2.1 port 4444 ssh2\n");
+        fs::write(&log, "").unwrap();
+        fs::write(dir.path().join("auth.log.1"), record("history")).unwrap();
+        let config = Config {
+            server_id: Id::new("server-demo").unwrap(),
+            owner_user_id: Some("123456789".into()),
+            bot_token_file: dir.path().join("token"),
+            state_dir: dir.path().into(),
+            default_locale: "en".into(),
+            ssh: SshConfig::File { path: log.clone() },
+        };
+        let database = Database::open(config.clone()).await.unwrap();
+        let mut collector = Collector::new(config.clone(), database.clone());
+        collector.scan().await.unwrap();
+        drop(collector);
+        fs::write(&log, record("first")).unwrap();
+        fs::rename(dir.path().join("auth.log.1"), dir.path().join("auth.log.3")).unwrap();
+        fs::rename(
+            &log,
+            dir.path().join(if numeric {
+                "auth.log.2"
+            } else {
+                "auth.log-previous"
+            }),
+        )
+        .unwrap();
+        if middle {
+            fs::write(dir.path().join("auth.log.1"), record("middle")).unwrap();
+        }
+        fs::write(&log, record("current")).unwrap();
+        let mut collector = Collector::new(config.clone(), database.clone());
+        collector.scan().await.unwrap();
+        assert_eq!(
+            database.call(|s| s.health(1000)).await.unwrap().pending,
+            if !numeric {
+                4
+            } else if middle {
+                3
+            } else {
+                2
+            }
+        );
+        assert_eq!(
+            collector.health().await.unwrap().gap_count == 0,
+            numeric && middle
+        );
+        drop(collector);
+        let mut collector = Collector::new(config, database.clone());
+        collector.scan().await.unwrap();
+        assert_eq!(
+            database.call(|s| s.health(1000)).await.unwrap().pending,
+            if !numeric {
+                4
+            } else if middle {
+                3
+            } else {
+                2
+            }
+        );
+    }
+}
+
+#[tokio::test]
 async fn truncate_regrow_and_incomplete_or_oversized_records_leave_following_events_readable() {
     let dir = tempfile::tempdir().unwrap();
     fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
@@ -406,8 +475,10 @@ async fn an_unavailable_rotated_file_produces_a_persistent_gap_and_new_events_co
     let health = collector.health().await.unwrap();
     assert_eq!(health.state, garde_contracts::SshStatus::Degraded);
     assert_eq!(health.last_gap.unwrap().as_str(), "ssh.file_missing");
+    let gaps = health.gap_count;
+    assert!(gaps > 0);
     collector.scan().await.unwrap();
-    assert_eq!(collector.health().await.unwrap().gap_count, 1);
+    assert_eq!(collector.health().await.unwrap().gap_count, gaps);
     assert_eq!(database.call(|s| s.health(1000)).await.unwrap().pending, 1);
 }
 
