@@ -41,9 +41,31 @@ async fn run() -> ExitCode {
         }
         _ => {}
     }
+    if let [command, middle @ .., flag, path] = args
+        && flag == "--config"
+        && let Some(query) = command.strip_prefix("--").and_then(|name| {
+            let values: Vec<_> = middle.iter().map(String::as_str).collect();
+            garde_daemon::history::Query::parse(name, &values)
+        })
+    {
+        let result = query.and_then(|query| {
+            let config = Config::load(Path::new(path))?;
+            garde_daemon::history::inspect(&config, query, garde_daemon::runtime::now())
+        });
+        return match result {
+            Ok(output) => match serde_json::to_string(&output) {
+                Ok(json) => {
+                    println!("{json}");
+                    ExitCode::from(u8::from(output.degraded()))
+                }
+                Err(_) => diagnostic_error("storage.failed"),
+            },
+            Err(code) => diagnostic_error(code),
+        };
+    }
     if args == ["--help"] {
         println!(
-            "{}: want-garde-daemon [--lang LOCALE] [--check-config | --delivery-status | --ssh-status | --firewall-status | --host-status | --services-status | --ports-status | --xui-status | --geoip-status | --geoip-event EVENT_ID | --ports-baseline-preview | --ports-baseline-accept HASH] --config PATH",
+            "{}: want-garde-daemon [--lang LOCALE] [--check-config | --delivery-status | --ssh-status | --firewall-status | --host-status | --services-status | --ports-status | --xui-status | --geoip-status | --geoip-event EVENT_ID | --recent [LIMIT [CURSOR]] | --history EVENT_ID | --stats [HOURS] | --health | --ports-baseline-preview | --ports-baseline-accept HASH] --config PATH",
             message(locale, "usage")
         );
         return ExitCode::SUCCESS;

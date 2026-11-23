@@ -103,6 +103,9 @@ pub fn decode_request(input: &str) -> Result<OperationRequest, ContractError> {
     serde_json::from_str(input).map_err(|_| invalid())
 }
 
+mod history;
+pub use history::*;
+
 mod models;
 pub use models::*;
 

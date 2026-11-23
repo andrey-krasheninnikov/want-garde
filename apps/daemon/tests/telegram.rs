@@ -30,6 +30,7 @@ async fn only_the_locally_bound_owner_receives_a_private_identifiable_snapshot()
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "ru".into(),
         ssh: Default::default(),
         owner_user_id: Some("123456789".into()),
@@ -76,6 +77,7 @@ async fn language_selection_survives_restart_and_all_locales_render_unicode_stat
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "en".into(),
         ssh: Default::default(),
         owner_user_id: Some("123456789".into()),
@@ -141,6 +143,7 @@ async fn identity_in_message_text_and_an_untrusted_chat_never_grant_access() {
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "en".into(),
         ssh: Default::default(),
         owner_user_id: Some("123456789".into()),
@@ -160,4 +163,57 @@ async fn identity_in_message_text_and_an_untrusted_chat_never_grant_access() {
                 .is_none()
         );
     }
+}
+
+#[tokio::test]
+async fn history_uses_saved_locale_and_rejects_unsafe_chat_context() {
+    let directory = tempfile::tempdir().unwrap();
+    fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let config: Config = serde_json::from_value(json!({
+        "server_id":"server-demo", "bot_token_file":directory.path().join("absent"),
+        "state_dir":directory.path(), "owner_user_id":"123456789", "default_locale":"he"
+    }))
+    .unwrap();
+    let database = garde_daemon::runtime::Database::open(config.clone())
+        .await
+        .unwrap();
+    let mut bot = Bot::new(config).unwrap();
+    let event: garde_contracts::Event =
+        serde_json::from_str(include_str!("../../../fixtures/contracts/event.json")).unwrap();
+    let event_id = event.id.as_str().to_owned();
+    database
+        .call(move |s| s.publish(&event, &[], garde_daemon::runtime::now()))
+        .await
+        .unwrap();
+    let update = |epoch, user, kind| {
+        json!({
+            "update_id":epoch, "message":{"from":{"id":user,"is_bot":false},
+            "chat":{"id":user,"type":kind},"text":"/recent"}
+        })
+    };
+    for (epoch, user, kind) in [
+        (1, 987654321, "private"),
+        (2, 123456789, "group"),
+        (3, 123456789, "private"),
+    ] {
+        bot.process_update(&database, &update(epoch, user, kind), &Host, "test_bot")
+            .await
+            .unwrap();
+    }
+    let (reply, pending) = database
+        .call(|s| {
+            let now = garde_daemon::runtime::now();
+            Ok((
+                s.claim(now)?.map(|delivery| delivery.reply),
+                s.health(now)?.pending,
+            ))
+        })
+        .await
+        .unwrap();
+    let reply = reply.unwrap();
+    assert_eq!(reply.chat_id, "123456789");
+    assert!(reply.text.starts_with("היסטוריית אירועים"));
+    assert!(reply.text.contains(&event_id));
+    assert!(reply.text.contains('\u{2068}'));
+    assert_eq!(pending, 0);
 }

@@ -21,6 +21,15 @@
     "client_disconnect_after_seconds": 180,
     "helper_socket": "/run/want-garde-xui.sock"
   },
+  "retention": {
+    "event_days": 30,
+    "action_audit_days": 30,
+    "process_audit_days": 7,
+    "result_hours": 24,
+    "database_mib": 64,
+    "pending_deliveries": 10000,
+    "result_mib": 32
+  },
   "geoip": {
     "enabled": false,
     "token_file": null

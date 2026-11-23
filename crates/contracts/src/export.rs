@@ -21,6 +21,9 @@ pub fn contract_artifacts() -> Result<BTreeMap<&'static str, String>, serde_json
     schema!("host-snapshot.schema.json", HostSnapshot);
     schema!("host-health.schema.json", HostHealth);
     schema!("delivery-health.schema.json", DeliveryHealth);
+    schema!("history-page.schema.json", HistoryPage);
+    schema!("history-stats.schema.json", HistoryStats);
+    schema!("installation-health.schema.json", InstallationHealth);
 
     schema!("ssh-health.schema.json", SshHealth);
     schema!("firewall-health.schema.json", FirewallHealth);
@@ -77,6 +80,13 @@ pub fn contract_artifacts() -> Result<BTreeMap<&'static str, String>, serde_json
         DeliveryState,
         DeliveryProblem,
         DeliveryHealth,
+        EventSummary,
+        HistoryPage,
+        EventCount,
+        HistoryStats,
+        SourceReport,
+        StorageReport,
+        InstallationHealth,
         SshSourceKind,
         SshStatus,
         SourceHealth,

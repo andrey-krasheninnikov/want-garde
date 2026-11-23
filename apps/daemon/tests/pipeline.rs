@@ -50,6 +50,7 @@ async fn an_event_passes_real_policy_and_sqlite_before_transport_delivery() {
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "en".into(),
         ssh: Default::default(),
     };
@@ -105,6 +106,7 @@ async fn delivery_diagnostics_enforce_owner_access_and_all_locales_survive_queue
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "en".into(),
         ssh: Default::default(),
     };
@@ -238,6 +240,7 @@ async fn a_slow_recipient_does_not_hold_delivery_to_another_recipient() {
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "en".into(),
         ssh: Default::default(),
     };
@@ -301,6 +304,7 @@ async fn a_fresh_status_command_after_an_idle_restart_reaches_the_outbox() {
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "en".into(),
         ssh: Default::default(),
     };
@@ -355,6 +359,7 @@ async fn ssh_diagnostics_and_events_use_current_owner_language_and_deny_other_ch
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "en".into(),
         ssh: SshConfig::File { path: log.clone() },
     };
@@ -453,6 +458,7 @@ async fn an_ssh_file_record_reaches_transport_through_the_durable_queue() {
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "en".into(),
         ssh: SshConfig::File { path: log.clone() },
     };
