@@ -4,6 +4,10 @@
   "state_dir": "/var/lib/want-garde",
   "default_locale": "ru",
   "owner_user_id": null,
+  "notifications": {
+    "private": [],
+    "forums": []
+  },
   "ssh": {
     "mode": "auto"
   },

@@ -2,9 +2,42 @@
 
 ## Русский
 
-Daemon сохраняет нормализованное событие и его доставки одной SQLite-транзакцией до отправки. Ответ Telegram и следующий polling offset также сохраняются вместе. Прогресс неподдерживаемых или запрещённых updates сохраняется без копирования их текста. Реальный источник в #4: событие запуска сервиса; остальные collectors добавляются последующими тикетами.
+Daemon сохраняет нормализованное событие и все его доставки одной транзакцией SQLite. Ответ на команду и следующий polling offset сохраняются вместе. Запрещённая или неподдерживаемая команда обновляет offset без сохранения текста.
 
-Получатель текущей установки: локально привязанный владелец в личном чате. Внутри очереди состояние каждого получателя независимо. До четырёх отправок выполняются одновременно, не более одной на получателя; медленный получатель не задерживает остальные. Настройка групп и forum topics относится к #12, политики важности и тихих часов к #13.
+### Получатели уведомлений
+
+По умолчанию события получает локально привязанный владелец в личном чате. Поле `notifications` в `config.json` позволяет добавить личные чаты и форумы.
+
+```json
+{
+  "notifications": {
+    "private": [
+      {
+        "chat_id": "234567890",
+        "options": { "locale": "ru", "protect_content": true }
+      }
+    ],
+    "forums": [
+      {
+        "chat_id": "-1001234567890",
+        "default_topic_id": 20,
+        "topics": [{ "event_type": "ssh.failed", "topic_id": 42 }],
+        "options": { "locale": "en", "silent": true, "privacy": "redacted" }
+      }
+    ]
+  }
+}
+```
+
+- Укажите положительный строковый `chat_id` для личного чата и отрицательный для форумной супергруппы. Личный получатель сначала открывает чат с ботом. Чтобы настроить форум, используйте `message.chat.id` и `message.message_thread_id` из сообщения в нужной теме. Боту требуется право отправки сообщений.
+- Каждый форум требует явный `default_topic_id`. Укажите ID темы больше 1 или `null` для General. `event_type` совпадает с `classification.rule_id` события. Например, `ssh.failed` направляется в тему 42, а `ssh.login` в тему 20. Для каждого типа в форуме задаётся один маршрут. `topic_id: null` явно направляет конкретный тип в General.
+- В одной установке до четырёх получателей с учётом владельца. Каждый чат указывается один раз. `retention.pending_deliveries` должен вмещать 2048 доставок на получателя, чтобы обработать максимальный пакет событий одной транзакцией.
+- `silent` и `protect_content` по умолчанию выключены и задаются отдельно. `locale` выбирает один из 12 языков. Дополнительный получатель без `locale` использует `default_locale`. Язык владельца берётся из `/language`, если его не переопределяет `notifications.owner.locale`.
+- Режим `full` показывает полный текст уведомления, включая GeoIP при наличии контекста. Это режим по умолчанию для владельца. Остальные получатели по умолчанию используют `redacted`. Он скрывает имя пользователя, заменяет последний октет IPv4 на `x`, скрывает IPv6 целиком и опускает остальные подтверждающие данные, GeoIP и подсказку `/geoip`. Для владельца параметры уведомлений задаются в `notifications.owner`.
+
+Команды доступны только владельцу в личном чате. Входящее сообщение не добавляет получателя. Конфигурация применяется к новым уведомлениям. Доставка сохраняет чат, тему, параметры отправки и режим приватности при постановке в очередь, включая повторы и перезапуск.
+
+Daemon проверяет режим форума и отправляет сообщение отдельными запросами к Telegram. Если отключить форум между запросами, Telegram может отправить сообщение в чат без темы. Оставляйте режим форума включённым, пока чат используется для доставки. При отказе Telegram доставка завершается без перехода в General или другую тему. Личные доставки выполняются независимо. В диагностике `telegram.forum_required` означает, что чат не форум, `telegram.forum_topic` означает отклонённый запрос к чату или теме, `telegram.forum_forbidden` означает запрет доступа, а `telegram.forum_response` отмечает ответ с неверной темой или неполными данными проверки чата. [Telegram Bot API](https://core.telegram.org/bots/api#sendmessage)
 
 ### Гарантии и сроки
 
@@ -37,15 +70,27 @@ sudo -u want-garde /usr/local/lib/want-garde/current/want-garde-daemon --deliver
 
 ### Ручное обновление и откат
 
-Перед обновлением остановите только `want-garde.service`, сохраните предыдущую ревизию и закрытую копию конфигурации и полного `state_dir`. Копия с остановленным writer включает базу и возможный journal. Храните секреты только на сервере с закрытыми правами. Установка #3 не содержит базы; первый обычный запуск создаёт schema 1, сохраняя владельца, токен и файл языка. История Python не импортируется.
+Перед обновлением остановите только `want-garde.service`, сохраните предыдущую ревизию и закрытую копию конфигурации и полного `state_dir`. Копия с остановленным writer включает базу и возможный journal. Храните секреты только на сервере с закрытыми правами. Обычный запуск создаёт schema 2 или обновляет schema 1 одной транзакцией. Доставки из schema 1 сохраняют ID, личный чат и исходный текст. Владелец, токен и файл языка сохраняются.
 
-После проверки Linux-артефакта переключите `current`, выполните `--check-config`, запустите сервис и проверьте `/status`, `/delivery` и повторный запуск. Не запускайте два poller с одним токеном. Неизвестная версия схемы и повреждённая база дают явную ошибку без пересоздания данных. Для отката к #3 остановите сервис, верните прежние бинарники и сохраните новую базу: #3 её не читает и не доставляет накопленную очередь. Не восстанавливайте старую копию поверх новых данных автоматически. Зашифрованные резервные копии и автоматический rollback реализуются отдельно.
+После проверки Linux-артефакта переключите `current`, выполните `--check-config`, запустите сервис и проверьте `/status`, `/delivery` и повторный запуск. Не запускайте два poller с одним токеном. Неизвестная версия схемы и повреждённая база дают явную ошибку без пересоздания данных. Бинарник со schema 1 отклоняет базу schema 2 до отправки. Для отката сохраните текущую базу отдельно и используйте совместимую копию `state_dir` и конфигурации, сделанную до обновления. Проверьте состояние доставки перед повторной отправкой из резервной копии. Зашифрованные резервные копии и автоматический rollback реализуются отдельно.
 
 ## English
 
-The daemon persists a normalized event and its deliveries in one SQLite transaction before transmission. A Telegram reply and its next polling offset are also committed together. Unsupported or denied updates advance progress without storing their text. The real event source in #4 is service startup; subsequent issues add collectors.
+The daemon commits a normalized event and all its deliveries in one SQLite transaction. It commits each command reply with the next polling offset. A denied or unsupported update advances the offset without storing the command text.
 
-The current recipient is the locally bound owner in a private chat. Each recipient has independent delivery state. Up to four sends run concurrently, with at most one per recipient; a slow recipient does not hold the others. Group and forum-topic configuration belongs to #12, severity policies and quiet hours to #13.
+### Notification recipients
+
+Events go to the locally bound owner in a private chat by default. Add private chats and forums under `notifications` in `config.json`, as shown above.
+
+- Use a positive quoted `chat_id` for a private chat and a negative quoted ID for a forum supergroup. A private recipient opens the chat with the bot first. For a forum, use `message.chat.id` and `message.message_thread_id` from a message in the intended topic. Give the bot permission to send messages.
+- Each forum requires an explicit `default_topic_id`. Use a topic ID greater than 1 or `null` for General. An `event_type` matches the event's `classification.rule_id`. In the example, `ssh.failed` goes to topic 42 and `ssh.login` goes to topic 20. Each event type can have one route per forum. Set `topic_id: null` to route a specific event type to General.
+- One installation supports up to four recipients including the owner. Each chat can appear once. Set `retention.pending_deliveries` to at least 2048 deliveries per recipient so the largest event batch fits in one transaction.
+- Set `silent` and `protect_content` independently. Both default to off. Set `locale` to one of the 12 supported languages. Additional recipients inherit `default_locale` when omitted. The owner uses `/language` unless `notifications.owner.locale` overrides it.
+- `full` shows the full notification, including GeoIP when available. This is the owner default. Other recipients default to `redacted`, which hides the username, replaces the last IPv4 octet with `x`, and hides the entire IPv6 address. It omits other evidence, GeoIP, and the `/geoip` hint. Use `notifications.owner` to set the owner's notification options.
+
+Commands require the owner's private chat. Incoming messages grant no subscription. Configuration changes apply to new deliveries. A queued delivery uses the same chat, topic, send options and privacy mode through retries and restarts.
+
+The sender verifies forum mode and posts in separate Telegram requests. If forum mode is disabled between those requests, Telegram can post the message to the chat without a topic. Keep forum mode enabled while the chat is configured for delivery. If Telegram rejects a topic request, the delivery ends without a fallback. Private deliveries continue independently. In diagnostics, `telegram.forum_required` means the chat is not a forum, `telegram.forum_topic` means Telegram rejected the chat or topic request, `telegram.forum_forbidden` marks a permission failure, and `telegram.forum_response` marks a topic mismatch or incomplete chat verification. [Telegram Bot API](https://core.telegram.org/bots/api#sendmessage)
 
 ### Guarantees and deadlines
 
@@ -72,6 +117,6 @@ Use private `/delivery` as the owner. When Telegram is unavailable, run the loca
 
 ### Manual update and rollback
 
-Stop only `want-garde.service` before an update. Preserve the previous revision and a private server-side copy of configuration and the complete `state_dir`. With the writer stopped, retain the database and any journal together. Keep secrets under restricted permissions. A #3 installation has no database: normal startup creates schema 1 while retaining owner, token, and locale file. Python history is not imported.
+Stop only `want-garde.service` before an update. Preserve the previous revision and a private server-side copy of configuration and the complete `state_dir`. With the writer stopped, retain the database and any journal together. Keep secrets under restricted permissions. Startup creates schema 2 or upgrades schema 1 in one transaction. Schema 1 deliveries keep their IDs, private chats and original text. The owner, token and locale file are preserved.
 
-Verify the Linux artifact, switch `current`, run `--check-config`, start the service, and check `/status`, `/delivery`, and restart. Never run two pollers with one token. Unsupported schema versions and corrupt databases fail explicitly without replacing data. To return to #3, stop the service, restore the previous binaries, and preserve the new database: #3 neither reads it nor delivers its queue. Never automatically restore an old backup over newer data. Encrypted backup and automatic rollback belong to later issues.
+Verify the Linux artifact, switch `current`, run `--check-config`, start the service, and check `/status`, `/delivery`, and restart. Never run two pollers with one token. Unsupported schema versions and corrupt databases fail explicitly without replacing data. A schema 1 binary rejects a schema 2 database before sending. To roll back, preserve the current database separately and use the compatible `state_dir` and configuration backup made before the upgrade. Check delivery status before resending from a backup. Encrypted backup and automatic rollback belong to later issues.

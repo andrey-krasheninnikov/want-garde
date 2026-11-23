@@ -1,6 +1,11 @@
 mod geoip;
+mod notifications;
 mod retention;
 pub use geoip::GeoIpConfig;
+pub use notifications::{
+    MAX_NOTIFICATION_RECIPIENTS, NotificationOptions, NotificationRouting, Privacy,
+    valid_notification_destination,
+};
 pub use retention::{MAX_OBSERVATION_BATCH, Retention};
 mod host;
 mod monitoring;
@@ -28,6 +33,8 @@ pub struct Config {
     pub state_dir: PathBuf,
     pub default_locale: String,
     pub owner_user_id: Option<String>,
+    #[serde(default)]
+    pub notifications: NotificationRouting,
     #[serde(default)]
     pub ssh: SshConfig,
     #[serde(default)]
@@ -159,7 +166,18 @@ impl Config {
         {
             return Err("config.invalid");
         }
+        value.validate_notifications()?;
         Ok(value)
+    }
+
+    pub fn validate_notifications(&self) -> Result<()> {
+        if !self.notifications.valid(
+            self.owner_user_id.as_deref(),
+            self.retention.pending_deliveries,
+        ) {
+            return Err("config.invalid");
+        }
+        Ok(())
     }
 
     pub fn owner(&self) -> Result<&str> {
@@ -267,6 +285,7 @@ pub fn bind_owner(path: &Path, user_id: &str) -> Result<()> {
             return Err("config.permissions");
         }
         config.owner_user_id = Some(user_id.to_owned());
+        config.validate_notifications()?;
         let mut bytes = serde_json::to_vec_pretty(&config).map_err(|_| "config.invalid")?;
         bytes.push(b'\n');
         atomic_write(path, &bytes, metadata.mode() & 0o777)

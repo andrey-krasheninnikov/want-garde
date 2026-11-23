@@ -32,6 +32,7 @@ async fn native_journal_tail_restart_and_missing_cursor() {
     let config = Config {
         server_id: Id::new("linux-fixture").unwrap(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
         bot_token_file: dir.path().join("absent-token"),
         state_dir: dir.path().into(),
         fail2ban: Default::default(),

@@ -1,4 +1,6 @@
-use garde_config::{Config, Result, atomic_write, read_private, valid_locale};
+use garde_config::{
+    Config, NotificationOptions, Privacy, Result, atomic_write, read_private, valid_locale,
+};
 use garde_contracts::{HostSnapshot, Measurement, OperationResult, PRODUCT_VERSION};
 use garde_entrypoint::{catalog, message};
 use serde::{Deserialize, Serialize};
@@ -30,6 +32,16 @@ pub struct Reply {
     pub locale: Option<String>,
     pub chat_id: String,
     pub text: String,
+    #[serde(skip)]
+    pub envelope: DeliveryEnvelope,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DeliveryEnvelope {
+    pub topic_id: Option<i32>,
+    pub silent: bool,
+    pub protect_content: bool,
+    pub redacted: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -47,6 +59,7 @@ pub struct Bot {
 impl Bot {
     pub fn new(config: Config) -> Result<Self> {
         config.owner()?;
+        config.validate_notifications()?;
         let preferences = config.state_dir.join("owner-preferences.json");
         let locale = match fs::symlink_metadata(&preferences) {
             Ok(_) => {
@@ -139,6 +152,7 @@ impl Bot {
             _ => message(&self.locale, "help_commands").to_owned(),
         };
         Ok(Some(Reply {
+            envelope: Default::default(),
             locale: None,
             chat_id: owner.to_owned(),
             text,
@@ -188,6 +202,7 @@ impl Bot {
                 }
             };
             Some(Reply {
+                envelope: Default::default(),
                 locale: None,
                 chat_id: self.config.owner()?.into(),
                 text,
@@ -213,6 +228,7 @@ impl Bot {
                 _ => message(&self.locale, "geoip_usage").into(),
             };
             Some(Reply {
+                envelope: Default::default(),
                 locale: None,
                 chat_id: self.config.owner()?.into(),
                 text,
@@ -245,6 +261,7 @@ impl Bot {
                 }
             };
             Some(Reply {
+                envelope: Default::default(),
                 locale: None,
                 chat_id: self.config.owner()?.into(),
                 text,
@@ -255,6 +272,7 @@ impl Bot {
         {
             let health = database.call(|store| store.health(runtime::now())).await?;
             Some(Reply {
+                envelope: Default::default(),
                 locale: None,
                 chat_id: self.config.owner()?.into(),
                 text: render_delivery(&health, &self.locale),
@@ -268,6 +286,7 @@ impl Bot {
                 .call(move |store| store.ssh_health(&config, runtime::now()))
                 .await?;
             Some(Reply {
+                envelope: Default::default(),
                 locale: None,
                 chat_id: self.config.owner()?.into(),
                 text: render_ssh(&health, &self.locale),
@@ -294,6 +313,7 @@ impl Bot {
                 firewall::render_health(&health, &self.locale)
             );
             Some(Reply {
+                envelope: Default::default(),
                 locale: None,
                 chat_id: self.config.owner()?.into(),
                 text,
@@ -304,6 +324,7 @@ impl Bot {
                 Err(code) => {
                     eprintln!("{code}: {}", message(&self.locale, "operation_failed"));
                     Some(Reply {
+                        envelope: Default::default(),
                         locale: None,
                         chat_id: self.config.owner()?.into(),
                         text: message(&self.locale, "operation_failed").into(),
@@ -330,57 +351,133 @@ impl Bot {
     }
 
     pub(crate) fn event_replies(&self, event: &garde_contracts::Event) -> Result<Vec<Reply>> {
-        let reason = message(&self.locale, event.classification.reason_key.as_str());
-        let reason = if reason == "message.unavailable" {
-            event.classification.reason_key.as_str()
-        } else {
-            reason
-        };
-        let mut text = format!(
-            "{}: {}\n{}\n{}",
-            message(&self.locale, "event_title"),
-            isolate(self.config.server_id.as_str()),
-            isolate(reason),
-            event.observed_at.to_rfc3339()
-        );
-        for evidence in event.evidence.iter().take(8) {
-            text.push_str(&format!(
-                "\n{}: {}",
-                isolate(
-                    if message(&self.locale, evidence.name.as_str()) == "message.unavailable" {
-                        evidence.name.as_str()
-                    } else {
-                        message(&self.locale, evidence.name.as_str())
-                    }
-                ),
-                isolate_evidence(
-                    if evidence.name.as_str() == "xui_reason"
-                        && message(&self.locale, &evidence.value) != "message.unavailable"
-                    {
-                        message(&self.locale, &evidence.value)
-                    } else if evidence.name.as_str() == "host_metric" {
-                        message(
-                            &self.locale,
-                            match evidence.value.as_str() {
-                                "disk" => "host_disk",
-                                "inode" => "host_inode",
-                                "reboot" => "host_reboot",
-                                value => value,
-                            },
-                        )
-                    } else {
-                        &evidence.value
-                    }
-                )
-            ));
-        }
-        let replies = vec![Reply {
-            locale: Some(self.locale.clone()),
-            chat_id: self.config.owner()?.into(),
-            text,
-        }];
+        let routing = &self.config.notifications;
+        let mut replies = vec![render_event(
+            event,
+            self.config.owner()?,
+            None,
+            &routing.owner,
+            &self.locale,
+            Privacy::Full,
+        )];
+        let default_locale = &self.config.default_locale;
+        replies.extend(routing.private.iter().map(|recipient| {
+            render_event(
+                event,
+                &recipient.chat_id,
+                None,
+                &recipient.options,
+                default_locale,
+                Privacy::Redacted,
+            )
+        }));
+        replies.extend(routing.forums.iter().map(|forum| {
+            let topic = forum
+                .topics
+                .iter()
+                .find(|route| route.event_type == event.classification.rule_id)
+                .map_or(forum.default_topic_id, |route| route.topic_id)
+                .thread_id();
+            render_event(
+                event,
+                &forum.chat_id,
+                topic,
+                &forum.options,
+                default_locale,
+                Privacy::Redacted,
+            )
+        }));
         Ok(replies)
     }
+}
+
+fn render_event(
+    event: &garde_contracts::Event,
+    chat_id: &str,
+    topic_id: Option<i32>,
+    options: &NotificationOptions,
+    default_locale: &str,
+    default_privacy: Privacy,
+) -> Reply {
+    let locale = options.locale.as_deref().unwrap_or(default_locale);
+    let redacted = options.privacy.unwrap_or(default_privacy) == Privacy::Redacted;
+    let translate = |key| message(locale, key);
+    let reason_key = event.classification.reason_key.as_str();
+    let reason = translate(reason_key);
+    let reason = if reason == "message.unavailable" {
+        reason_key
+    } else {
+        reason
+    };
+    let mut text = format!(
+        "{}: {}\n{}\n{}",
+        translate("event_title"),
+        isolate(event.server_id.as_str()),
+        isolate(reason),
+        isolate(&event.observed_at.to_rfc3339())
+    );
+    for evidence in event.evidence.iter().take(8) {
+        let name = evidence.name.as_str();
+        let masked;
+        let value = if redacted {
+            let Some(value) = redact_evidence(name, &evidence.value, locale) else {
+                continue;
+            };
+            masked = value;
+            &masked
+        } else if name == "xui_reason" && translate(&evidence.value) != "message.unavailable" {
+            translate(&evidence.value)
+        } else if name == "host_metric" {
+            translate(match evidence.value.as_str() {
+                "disk" => "host_disk",
+                "inode" => "host_inode",
+                "reboot" => "host_reboot",
+                value => value,
+            })
+        } else {
+            &evidence.value
+        };
+        let label = translate(name);
+        let label = if label == "message.unavailable" {
+            name
+        } else {
+            label
+        };
+        text.push_str(&format!(
+            "\n{}: {}",
+            isolate(label),
+            isolate_evidence(value)
+        ));
+    }
+    Reply {
+        locale: Some(locale.to_owned()),
+        chat_id: chat_id.to_owned(),
+        text,
+        envelope: DeliveryEnvelope {
+            topic_id,
+            silent: options.silent,
+            protect_content: options.protect_content,
+            redacted,
+        },
+    }
+}
+
+fn redact_evidence(name: &str, value: &str, locale: &str) -> Option<String> {
+    use std::net::{IpAddr, SocketAddr};
+    let marker = message(locale, "event_redacted");
+    let ip = match name {
+        "user" => return Some(format!("[{marker}]")),
+        "ip" | "remote_ip" | "xui_ip" => value.parse::<IpAddr>().ok()?,
+        "xui_source" => value.parse::<SocketAddr>().ok()?.ip(),
+        _ => return None,
+    };
+    Some(match ip {
+        IpAddr::V4(v) => {
+            let [a, b, c, _] = v.octets();
+            format!("{a}.{b}.{c}.x")
+        }
+        IpAddr::V6(_) => format!("IPv6 [{marker}]"),
+    })
 }
 
 fn render_ssh(health: &garde_contracts::SshHealth, locale: &str) -> String {

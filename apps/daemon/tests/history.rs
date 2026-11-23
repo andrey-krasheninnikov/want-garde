@@ -86,6 +86,7 @@ fn limits_preserve_unfinished_delivery_and_expire_completed_storage() {
     let now = 100_000;
     let reply = || {
         Some(Reply {
+            envelope: Default::default(),
             locale: None,
             chat_id: "123456789".into(),
             text: "pending result".into(),
@@ -96,6 +97,7 @@ fn limits_preserve_unfinished_delivery_and_expire_completed_storage() {
         serde_json::from_str(include_str!("../../../fixtures/contracts/event.json")).unwrap();
     let replies: Vec<_> = (0..32)
         .map(|i| Reply {
+            envelope: Default::default(),
             locale: None,
             chat_id: (123450000 + i).to_string(),
             text: "queued event".into(),
