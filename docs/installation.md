@@ -42,7 +42,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now want-garde.service
 ```
 
-Токен вводится редактором в отдельный файл, одной строкой. Не передавайте его через аргументы, shell history, Git или сообщения. В config задайте стабильный `server_id`, абсолютные `bot_token_file` и `state_dir`, поддерживаемый `default_locale`. Начальный `owner_user_id` равен null; CLI сохраняет десятичную строку. Повтор того же ID успешен; другой ID отклоняется. CLI сохраняет mode/group конфигурации. Не изменяйте привязку при работающем сервисе: изменения конфигурации применяются после restart.
+Токен вводится редактором в отдельный файл, одной строкой. Не передавайте его через аргументы, shell history, Git или сообщения. В config задайте стабильный `server_id`, абсолютные `bot_token_file` и `state_dir`, поддерживаемый `default_locale`. Начальный `owner_user_id` равен null; CLI сохраняет десятичную строку. Повтор того же ID успешен; другой ID отклоняется. CLI сохраняет mode/group конфигурации. Не изменяйте привязку при работающем сервисе: изменения конфигурации применяются после restart. Делегируйте отдельные команды по [инструкции доступа в Telegram](telegram-access.md#настройка-доступа).
 
 ### Проверка и остановка
 
@@ -76,7 +76,7 @@ The manual CI workflow produces a development artifact named `linux-x86_64-<comm
 
 The installation commands above apply to a new installation. Inspect any existing `want-garde` account, unit, or directory before reuse. Replace `<commit>` with the reviewed full SHA and `123456789` with your Telegram user ID. The commands create a separate system account, restricted configuration/token files, a private state directory, an immutable binary directory, and a `current` symlink. Enable the unit only after `--check-config` succeeds as the service user.
 
-Enter the token as one line using an editor, never through arguments, shell history, Git, or messages. Configure a stable `server_id`, absolute `bot_token_file` and `state_dir` paths, and a supported `default_locale`. The initial `owner_user_id` is null. The local CLI stores a decimal string, accepts the same ID idempotently, refuses another ID, and preserves configuration mode/group. Bind or change configuration while the service is stopped; restart to apply changes.
+Enter the token as one line using an editor, never through arguments, shell history, Git, or messages. Configure a stable `server_id`, absolute `bot_token_file` and `state_dir` paths, and a supported `default_locale`. The initial `owner_user_id` is null. The local CLI stores a decimal string, accepts the same ID idempotently, refuses another ID, and preserves configuration mode/group. Bind or change configuration while the service is stopped; restart to apply changes. See [Telegram access](telegram-access.md#set-up-access) to delegate individual commands.
 
 ### Verification and shutdown
 

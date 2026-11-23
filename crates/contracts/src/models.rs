@@ -88,6 +88,39 @@ pub enum Capability {
     IncidentsRead,
 }
 
+impl Capability {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::GeoIpRead => "geoip.read",
+            Self::StatusRead => "status.read",
+            Self::BansRead => "bans.read",
+            Self::ServicesRead => "services.read",
+            Self::PortsRead => "ports.read",
+            Self::XuiRead => "xui.read",
+            Self::EventsRead => "events.read",
+            Self::IncidentsRead => "incidents.read",
+        }
+    }
+}
+
+impl std::str::FromStr for Capability {
+    type Err = ();
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "geoip.read" => Ok(Self::GeoIpRead),
+            "status.read" => Ok(Self::StatusRead),
+            "bans.read" => Ok(Self::BansRead),
+            "services.read" => Ok(Self::ServicesRead),
+            "ports.read" => Ok(Self::PortsRead),
+            "xui.read" => Ok(Self::XuiRead),
+            "events.read" => Ok(Self::EventsRead),
+            "incidents.read" => Ok(Self::IncidentsRead),
+            _ => Err(()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
 #[serde(deny_unknown_fields)]
 pub struct Scope {

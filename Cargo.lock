@@ -443,6 +443,7 @@ name = "garde-cli"
 version = "0.1.0-dev.0"
 dependencies = [
  "garde-config",
+ "garde-contracts",
  "garde-entrypoint",
  "serde_json",
  "tempfile",
@@ -481,6 +482,7 @@ dependencies = [
  "garde-contracts",
  "garde-entrypoint",
  "garde-xui",
+ "getrandom 0.4.3",
  "hickory-proto",
  "percent-encoding",
  "regex",

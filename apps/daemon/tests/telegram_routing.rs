@@ -443,7 +443,13 @@ async fn notifications_do_not_authorize_commands_or_register_an_unknown_chat() {
 }
 
 #[test]
-fn legacy_owner_delivery_retains_its_identity_body_and_settings_on_schema_upgrade() {
+fn legacy_deliveries_keep_their_identity_and_envelope_on_schema_upgrade() {
+    for version in [1, 2] {
+        check_schema_upgrade(version);
+    }
+}
+
+fn check_schema_upgrade(version: i32) {
     let directory = tempfile::tempdir().unwrap();
     fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700)).unwrap();
     let path = directory.path().join("garde.sqlite3");
@@ -466,6 +472,18 @@ fn legacy_owner_delivery_retains_its_identity_body_and_settings_on_schema_upgrad
         VALUES(5,'telegram:0:6','123456789','saved message' || char(10) || 'ID: d-5',1000,1000,1000,2000);
         PRAGMA user_version=1;
     ").unwrap();
+    if version == 2 {
+        connection.execute_batch("
+            ALTER TABLE deliveries ADD COLUMN topic_id INTEGER;
+            ALTER TABLE deliveries ADD COLUMN silent INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE deliveries ADD COLUMN protect_content INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE deliveries ADD COLUMN redacted INTEGER NOT NULL DEFAULT 0;
+            INSERT INTO events VALUES('event-fixture','{}',1000);
+            INSERT INTO deliveries(id,event_id,chat_id,text,next_at,created_at,updated_at,expires_at,topic_id,silent,protect_content,redacted)
+            VALUES(6,'event-fixture','-1001234567890','forum message',1000,1000,1000,2000,42,1,1,1);
+            PRAGMA user_version=2;
+        ").unwrap();
+    }
     drop(connection);
 
     let mut store = Store::open(directory.path(), "server-demo", "123456789").unwrap();
@@ -475,10 +493,65 @@ fn legacy_owner_delivery_retains_its_identity_body_and_settings_on_schema_upgrad
     assert_eq!(delivery.reply.chat_id, "123456789");
     assert_eq!(delivery.reply.text, "saved message\nID: d-5");
     assert_eq!(delivery.reply.envelope, DeliveryEnvelope::default());
+    if version == 2 {
+        let forum = store.claim(1000).unwrap().unwrap();
+        assert_eq!(forum.id, 6);
+        assert_eq!(forum.reply.chat_id, "-1001234567890");
+        assert_eq!(forum.reply.text, "forum message");
+        assert_eq!(
+            forum.reply.envelope,
+            DeliveryEnvelope {
+                topic_id: Some(42),
+                silent: true,
+                protect_content: true,
+                redacted: true,
+            }
+        );
+    }
     drop(store);
     let connection = rusqlite::Connection::open(&path).unwrap();
     let version: i32 = connection
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 2);
+    assert_eq!(version, 3);
+}
+
+#[tokio::test]
+async fn owner_grant_explicitly_allows_one_user_chat_and_read_capability() {
+    let directory = tempfile::tempdir().unwrap();
+    fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let config = config(directory.path());
+    let mut bot = Bot::new(config.clone()).unwrap();
+    let database = Database::open(config).await.unwrap();
+    let group = -987654321_i64;
+
+    for (id, actor, chat, kind, command) in [
+        (
+            1,
+            123456789,
+            123456789,
+            "private",
+            "/access grant 234567890 -987654321 geoip.read",
+        ),
+        (2, 345678901, group, "group", "/geoip"),
+        (3, 234567890, group - 1, "group", "/geoip"),
+        (4, 234567890, group, "group", "/status"),
+        (5, 234567890, group, "group", "/geoip"),
+    ] {
+        let update = json!({
+            "update_id": id,
+            "message": {"from":{"id":actor,"is_bot":false},"chat":{"id":chat,"type":kind},"text":command}
+        });
+        bot.process_update(&database, &update, &Host, "test_bot")
+            .await
+            .unwrap();
+    }
+    let acknowledgement = claim(&database, now()).await.unwrap();
+    assert_eq!(acknowledgement.reply.chat_id, "123456789");
+    finish(&database, acknowledgement.id, Outcome::Delivered).await;
+    let reply = claim(&database, now()).await.expect("granted read result");
+    assert_eq!(reply.reply.chat_id, "234567890");
+    assert!(reply.reply.text.contains("GeoIP"));
+    finish(&database, reply.id, Outcome::Delivered).await;
+    assert!(claim(&database, now()).await.is_none());
 }

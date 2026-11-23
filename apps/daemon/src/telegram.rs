@@ -1,10 +1,13 @@
 use crate::Reply;
-use crate::runtime::{Identity, Transport};
+use crate::delivery::Delivery;
+use crate::runtime::{CallbackAck, Database, Dispatch, Identity, Transport};
 use garde_config::{MAX_TELEGRAM_ROUTES, TelegramEgress, TelegramRoute, Token};
 use reqwest::{Client, ClientBuilder, RequestBuilder, Response, multipart};
 use serde_json::{Value, json};
 use std::time::Duration;
 
+#[cfg(test)]
+mod access_tests;
 mod route;
 use route::Route;
 
@@ -44,7 +47,7 @@ impl TransportError {
             retry_after: Duration::ZERO,
         }
     }
-    fn recipient(code: &'static str) -> Self {
+    pub(crate) fn recipient(code: &'static str) -> Self {
         Self {
             code,
             kind: FailureKind::Recipient,
@@ -100,8 +103,19 @@ impl Telegram {
         &self,
         request: impl Fn(&Client) -> RequestBuilder,
     ) -> Result<Response, TransportError> {
+        self.permitted_request(request, None).await
+    }
+
+    async fn permitted_request(
+        &self,
+        request: impl Fn(&Client) -> RequestBuilder,
+        dispatch: Option<&Dispatch<'_>>,
+    ) -> Result<Response, TransportError> {
         let mut routes = self.routes.iter().enumerate().peekable();
         while let Some((index, route)) = routes.next() {
+            if let Some(dispatch) = dispatch {
+                dispatch.verify().await?;
+            }
             match request(&route.client).send().await {
                 Ok(response) => return Ok(response),
                 // Hyper's connect error precedes transmission of this request.
@@ -125,8 +139,19 @@ impl Telegram {
     }
 
     async fn call(&self, method: &str, data: Value) -> Result<Value, TransportError> {
+        self.call_allowed(method, data, None).await
+    }
+
+    async fn call_allowed(
+        &self,
+        method: &str,
+        data: Value,
+        dispatch: Option<&Dispatch<'_>>,
+    ) -> Result<Value, TransportError> {
         let url = format!("{}{method}", self.api_prefix);
-        let response = self.request(|client| client.post(&url).json(&data)).await?;
+        let response = self
+            .permitted_request(|client| client.post(&url).json(&data), dispatch)
+            .await?;
         api_result(method, response).await
     }
 
@@ -367,7 +392,7 @@ impl Transport for Telegram {
         let value = self
             .call(
                 "getUpdates",
-                json!({"offset":offset,"timeout":25,"limit":32,"allowed_updates":["message"]}),
+                json!({"offset":offset,"timeout":25,"limit":32,"allowed_updates":["message","callback_query"]}),
             )
             .await?;
         let list = value
@@ -385,6 +410,34 @@ impl Transport for Telegram {
     }
 
     async fn send(&self, reply: &Reply) -> Result<(), TransportError> {
+        self.send_reply(reply, None).await
+    }
+
+    async fn send_access(
+        &self,
+        delivery: &Delivery,
+        database: &Database,
+    ) -> Result<(), TransportError> {
+        self.send_reply(&delivery.reply, Some(&Dispatch { delivery, database }))
+            .await
+    }
+
+    async fn answer_callback(&self, ack: &CallbackAck) -> Result<(), TransportError> {
+        let mut payload = json!({"callback_query_id": ack.id});
+        if let Some(text) = ack.text {
+            payload["text"] = json!(text);
+        }
+        self.call("answerCallbackQuery", payload).await?;
+        Ok(())
+    }
+}
+
+impl Telegram {
+    async fn send_reply(
+        &self,
+        reply: &Reply,
+        dispatch: Option<&Dispatch<'_>>,
+    ) -> Result<(), TransportError> {
         if reply.text.encode_utf16().count() > 4096 {
             return Err(TransportError::recipient("telegram.message_size"));
         }
@@ -402,8 +455,12 @@ impl Transport for Telegram {
             "disable_notification": reply.envelope.silent,
             "protect_content": reply.envelope.protect_content,
         });
-        let forum = expected_chat < 0;
-        if forum {
+        let group = expected_chat < 0;
+        let mut forum = false;
+        if group {
+            if let Some(dispatch) = dispatch {
+                dispatch.verify().await?;
+            }
             // Telegram can ignore a thread ID when the chat is not a forum.
             let chat = self
                 .call("getChat", json!({"chat_id": reply.chat_id}))
@@ -417,15 +474,27 @@ impl Transport for Telegram {
                 error.uncertain = false;
                 return Err(error);
             }
-            if chat["type"] != "supergroup" || chat["is_forum"] != true {
-                return Err(TransportError::recipient("telegram.forum_required"));
+            forum = chat["type"] == "supergroup" && chat["is_forum"] == true;
+            if dispatch.is_none() || topic_id.is_some() {
+                if !forum {
+                    return Err(TransportError::recipient("telegram.forum_required"));
+                }
+            } else if chat["type"] != "group" && chat["type"] != "supergroup" {
+                return Err(TransportError::recipient("telegram.group_required"));
             }
         }
         if let Some(topic_id) = topic_id {
             payload["message_thread_id"] = json!(topic_id);
         }
+        if let Some(dispatch) = dispatch
+            && let Some(button) = dispatch.button().await?
+        {
+            payload["reply_markup"] = json!({"inline_keyboard":[[
+                {"text": garde_entrypoint::message(&button.locale,"access_refresh"), "callback_data": button.token}
+            ]]});
+        }
         let result = self
-            .call("sendMessage", payload)
+            .call_allowed("sendMessage", payload, dispatch)
             .await
             .map_err(|error| if forum { forum_error(error) } else { error })?;
         if result["message_id"].as_i64().is_none_or(|id| id <= 0)
@@ -433,9 +502,10 @@ impl Transport for Telegram {
         {
             return Err(TransportError::transient("telegram.response"));
         }
-        if forum
-            && (result["chat"]["is_forum"] != true
-                || result["message_thread_id"].as_i64() != topic_id.map(i64::from))
+        let actual_topic = result["message_thread_id"]
+            .as_i64()
+            .filter(|id| dispatch.is_none() || *id != 1);
+        if forum && (result["chat"]["is_forum"] != true || actual_topic != topic_id.map(i64::from))
         {
             return Err(TransportError::recipient("telegram.forum_response"));
         }
@@ -461,8 +531,15 @@ mod tests {
         thread,
     };
 
-    fn server(
+    pub(super) fn server(
         responses: Vec<(u16, Value)>,
+    ) -> (Telegram, thread::JoinHandle<Vec<(String, Value)>>) {
+        server_with_hook(responses, |_| {})
+    }
+
+    pub(super) fn server_with_hook(
+        responses: Vec<(u16, Value)>,
+        on_request: impl Fn(&str) + Send + 'static,
     ) -> (Telegram, thread::JoinHandle<Vec<(String, Value)>>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
@@ -506,6 +583,7 @@ mod tests {
                 assert!(length < 16384);
                 let mut payload = vec![0; length];
                 reader.read_exact(&mut payload).unwrap();
+                on_request(&path);
                 requests.push((path, serde_json::from_slice(&payload).unwrap()));
                 if status == 0 {
                     continue;
@@ -952,7 +1030,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn sends_copyable_monospace_unicode_without_parsing_markup_and_polls_only_messages() {
+    async fn sends_copyable_monospace_unicode_without_parsing_markup_and_polls_for_commands() {
         let (api, worker) = server(vec![
             (
                 200,
@@ -979,7 +1057,10 @@ mod tests {
         .await
         .unwrap();
         let observed = worker.join().unwrap();
-        assert_eq!(observed[2].1["allowed_updates"], json!(["message"]));
+        assert_eq!(
+            observed[2].1["allowed_updates"],
+            json!(["message", "callback_query"])
+        );
         assert_eq!(observed[2].1["offset"], 42);
         assert_eq!(observed[3].1["text"], "שלום <host> مرحبا 🛡");
         assert!(observed[3].1.get("parse_mode").is_none());
