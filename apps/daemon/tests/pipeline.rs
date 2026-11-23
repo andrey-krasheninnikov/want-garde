@@ -41,6 +41,7 @@ async fn an_event_passes_real_policy_and_sqlite_before_transport_delivery() {
     let config = Config {
         server_id: Id::new("server-demo").unwrap(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         fail2ban: Default::default(),
@@ -97,6 +98,7 @@ async fn delivery_diagnostics_enforce_owner_access_and_all_locales_survive_queue
     let config = Config {
         server_id: Id::new("server-demo").unwrap(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         fail2ban: Default::default(),
@@ -231,6 +233,7 @@ async fn a_slow_recipient_does_not_hold_delivery_to_another_recipient() {
     let config = Config {
         server_id: Id::new("server-demo").unwrap(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         fail2ban: Default::default(),
@@ -253,11 +256,13 @@ async fn a_slow_recipient_does_not_hold_delivery_to_another_recipient() {
                 &event,
                 &[
                     Reply {
+                        envelope: Default::default(),
                         locale: None,
                         chat_id: "123456789".into(),
                         text: "slow".into(),
                     },
                     Reply {
+                        envelope: Default::default(),
                         locale: None,
                         chat_id: "987654321".into(),
                         text: "fast".into(),
@@ -295,6 +300,7 @@ async fn a_fresh_status_command_after_an_idle_restart_reaches_the_outbox() {
     let config = Config {
         server_id: Id::new("server-demo").unwrap(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         fail2ban: Default::default(),
@@ -350,6 +356,7 @@ async fn ssh_diagnostics_and_events_use_current_owner_language_and_deny_other_ch
     let config = Config {
         server_id: Id::new("server-demo").unwrap(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         fail2ban: Default::default(),
@@ -449,6 +456,7 @@ async fn an_ssh_file_record_reaches_transport_through_the_durable_queue() {
     let config = Config {
         server_id: Id::new("server-demo").unwrap(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         fail2ban: Default::default(),

@@ -19,6 +19,7 @@ fn delivery_diagnostics_are_read_only_json_and_work_without_a_token() {
         default_locale: "en".into(),
         ssh: Default::default(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
     };
     let path = dir.path().join("config.json");
     fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
@@ -29,6 +30,7 @@ fn delivery_diagnostics_are_read_only_json_and_work_without_a_token() {
         .consume_update(
             1,
             Some(garde_daemon::Reply {
+                envelope: Default::default(),
                 locale: None,
                 chat_id: "123456789".into(),
                 text: "private_result".into(),

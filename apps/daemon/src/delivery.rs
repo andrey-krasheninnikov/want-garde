@@ -1,6 +1,6 @@
-use crate::Reply;
+use crate::{DeliveryEnvelope, Reply};
 use chrono::{DateTime, Utc};
-use garde_config::Result;
+use garde_config::{MAX_NOTIFICATION_RECIPIENTS, Result, valid_notification_destination};
 use garde_contracts::{DeliveryHealth, DeliveryProblem, DeliveryState, Event, Id, WireVersion};
 use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
 use std::{
@@ -136,7 +136,7 @@ impl Store {
         if page_size != 4096 {
             return Err("storage.version");
         }
-        if ![0, 1].contains(&version) {
+        if ![0, 1, 2].contains(&version) {
             return Err("storage.version");
         }
         if version == 0 {
@@ -154,7 +154,7 @@ impl Store {
         if pages > max_pages {
             return Err("storage.quota");
         }
-        if version == 1 {
+        if version != 0 {
             for query in [
                 "SELECT id,payload,created_at FROM events LIMIT 0",
                 "SELECT id,event_id,request_id,chat_id,text,state,attempts,next_at,created_at,updated_at,expires_at,last_error,uncertain FROM deliveries LIMIT 0",
@@ -190,7 +190,7 @@ impl Store {
             ] {
                 sql(transaction.execute("INSERT INTO meta VALUES(?1,?2)", params![key, value]))?;
             }
-            sql(transaction.pragma_update(None, "user_version", 1))?;
+            add_delivery_envelope(&transaction)?;
             sql(transaction.commit())?;
         }
         for (key, value) in [("server", server), ("owner", owner)] {
@@ -222,6 +222,13 @@ impl Store {
         if let Some(saved) = saved {
             crate::ssh::State::decode(&saved)?;
         }
+        if version == 1 {
+            let transaction = sql(connection.transaction())?;
+            add_delivery_envelope(&transaction)?;
+            sql(transaction.commit())?;
+        }
+        sql(connection
+            .prepare("SELECT topic_id,silent,protect_content,redacted FROM deliveries LIMIT 0"))?;
         sql(connection.execute("UPDATE deliveries SET state='pending',uncertain=1,last_error='delivery.uncertain' WHERE state='in_flight'",[]))?;
         crate::geoip::initialize(&connection)?;
         crate::retention::initialize(&connection)?;
@@ -605,7 +612,7 @@ impl Store {
         } else {
             1024
         };
-        if publications.len() > limit || count > limit || now < 0 {
+        if publications.len() > limit || count > limit * MAX_NOTIFICATION_RECIPIENTS || now < 0 {
             return Err("event.invalid");
         }
         self.admit(count as i64, now)?;
@@ -658,7 +665,29 @@ impl Store {
         self.maintenance(now)?;
         let transaction = sql(self.connection.transaction())?;
         sql(transaction.execute("UPDATE deliveries SET state='dead_letter',last_error=CASE WHEN expires_at<=?1 THEN 'delivery.expired' ELSE 'delivery.exhausted' END,updated_at=?1 WHERE id IN (SELECT id FROM deliveries WHERE state='pending' AND (expires_at<=?1 OR attempts>=128) LIMIT 100)",[now]))?;
-        let mut value = sql(transaction.query_row("SELECT id,chat_id,text,attempts FROM deliveries d WHERE state='pending' AND next_at<=?1 AND expires_at>?1 AND attempts<128 AND NOT EXISTS(SELECT 1 FROM deliveries a WHERE a.chat_id=d.chat_id AND a.state='in_flight') AND NOT EXISTS(SELECT 1 FROM cooldowns c WHERE c.chat_id=d.chat_id AND c.until_at>?1) ORDER BY next_at,id LIMIT 1",[now],|r| Ok(Delivery { id:r.get(0)?, reply:Reply { locale: None, chat_id:r.get(1)?, text:r.get(2)? },attempts:r.get::<_,u32>(3)?+1 })).optional())?;
+        let mut value = sql(transaction.query_row(
+            "SELECT id,chat_id,text,attempts,topic_id,silent,protect_content,redacted
+             FROM deliveries d WHERE state='pending' AND next_at<=?1 AND expires_at>?1 AND attempts<128
+             AND NOT EXISTS(SELECT 1 FROM deliveries a WHERE a.chat_id=d.chat_id AND a.state='in_flight')
+             AND NOT EXISTS(SELECT 1 FROM cooldowns c WHERE c.chat_id=d.chat_id AND c.until_at>?1)
+             ORDER BY next_at,id LIMIT 1",
+            [now],
+            |r| Ok(Delivery {
+                id: r.get(0)?,
+                attempts: r.get::<_,u32>(3)? + 1,
+                reply: Reply {
+                    locale: None,
+                    chat_id: r.get(1)?,
+                    text: r.get(2)?,
+                    envelope: DeliveryEnvelope {
+                        topic_id: r.get(4)?,
+                        silent: r.get(5)?,
+                        protect_content: r.get(6)?,
+                        redacted: r.get(7)?,
+                    },
+                },
+            }),
+        ).optional())?;
         if let Some(value) = &mut value {
             crate::geoip::prepare_delivery(&transaction, value)?;
             sql(transaction.execute("UPDATE deliveries SET state='in_flight',attempts=attempts+1,updated_at=?1,next_at=?3 WHERE id=?2",params![now,value.id,now.saturating_add(backoff(value.attempts) as i64)]))?;
@@ -849,7 +878,7 @@ pub(crate) fn inspect_connection(
     ))?;
     sql(connection.busy_timeout(Duration::from_millis(250)))?;
     let version: i64 = sql(connection.query_row("PRAGMA user_version", [], |r| r.get(0)))?;
-    if version != 1 {
+    if ![1, 2].contains(&version) {
         return Err("storage.version");
     }
     for (key, value) in [("server", server), ("owner", owner)] {
@@ -999,6 +1028,15 @@ fn backoff(attempt: u32) -> u64 {
     (5u64 << attempt.saturating_sub(1).min(8)).min(900)
 }
 
+fn add_delivery_envelope(transaction: &rusqlite::Transaction<'_>) -> Result<()> {
+    sql(transaction.execute_batch("
+        ALTER TABLE deliveries ADD COLUMN topic_id INTEGER CHECK (topic_id IS NULL OR topic_id BETWEEN 2 AND 2147483647);
+        ALTER TABLE deliveries ADD COLUMN silent INTEGER NOT NULL DEFAULT 0 CHECK (silent IN (0,1));
+        ALTER TABLE deliveries ADD COLUMN protect_content INTEGER NOT NULL DEFAULT 0 CHECK (protect_content IN (0,1));
+        ALTER TABLE deliveries ADD COLUMN redacted INTEGER NOT NULL DEFAULT 0 CHECK (redacted IN (0,1));"))?;
+    sql(transaction.pragma_update(None, "user_version", 2))
+}
+
 fn enqueue_event(
     transaction: &rusqlite::Transaction<'_>,
     event: &Event,
@@ -1014,9 +1052,11 @@ fn enqueue_event(
             .as_deref()
             .or_else(|| config.map(|c| c.default_locale.as_str()))
             .unwrap_or("en");
+        let context = context.as_ref().filter(|_| !reply.envelope.redacted);
         let enriched;
-        let reply = if let Some(context) = &context {
+        let reply = if let Some(context) = context {
             enriched = Reply {
+                envelope: reply.envelope,
                 locale: None,
                 chat_id: reply.chat_id.clone(),
                 text: crate::geoip::render_notification(body, context, locale),
@@ -1033,10 +1073,7 @@ fn enqueue_event(
             now,
             86400,
         )?;
-        if context
-            .as_ref()
-            .is_some_and(|c| c.reason_key.as_str() == "geoip_pending")
-        {
+        if context.is_some_and(|c| c.reason_key.as_str() == "geoip_pending") {
             let id = transaction.last_insert_rowid();
             sql(transaction.execute(
                 "INSERT INTO geoip_deliveries VALUES(?1,?2,?3)",
@@ -1060,14 +1097,25 @@ fn enqueue(
     now: i64,
     ttl: i64,
 ) -> Result<()> {
-    if !garde_config::valid_user_id(&reply.chat_id)
+    let DeliveryEnvelope {
+        topic_id,
+        silent,
+        protect_content,
+        redacted,
+    } = reply.envelope;
+    if !valid_notification_destination(&reply.chat_id, topic_id)
+        || (event.is_none() && reply.chat_id.starts_with('-'))
         || reply.text.encode_utf16().count() > 3900
         || now < 0
     {
         return Err("delivery.invalid");
     }
     let expires = now.checked_add(ttl).ok_or("delivery.invalid")?;
-    sql(transaction.execute("INSERT INTO deliveries(event_id,request_id,chat_id,text,next_at,created_at,updated_at,expires_at) VALUES(?1,?2,?3,?4,?5,?5,?5,?6)",params![event,request,reply.chat_id,reply.text,now,expires]))?;
+    sql(transaction.execute(
+        "INSERT INTO deliveries(event_id,request_id,chat_id,text,next_at,created_at,updated_at,expires_at,topic_id,silent,protect_content,redacted)
+         VALUES(?1,?2,?3,?4,?5,?5,?5,?6,?7,?8,?9,?10)",
+        params![event,request,reply.chat_id,reply.text,now,expires,topic_id,silent,protect_content,redacted],
+    ))?;
     let id = transaction.last_insert_rowid();
     let text = delivery_text(&reply.text, event, id);
     sql(transaction.execute(
@@ -1107,6 +1155,7 @@ mod tests {
             let result = store.consume_update(
                 id,
                 Some(Reply {
+                    envelope: Default::default(),
                     locale: None,
                     chat_id: "123456789".into(),
                     text: "x".repeat(3800),
@@ -1137,6 +1186,7 @@ mod tests {
                 .consume_update(
                     id,
                     Some(Reply {
+                        envelope: Default::default(),
                         locale: None,
                         chat_id: "123456789".into(),
                         text: "quota".into(),
@@ -1149,6 +1199,7 @@ mod tests {
             store.consume_update(
                 10000,
                 Some(Reply {
+                    envelope: Default::default(),
                     locale: None,
                     chat_id: "123456789".into(),
                     text: "over quota".into()

@@ -34,6 +34,7 @@ async fn only_the_locally_bound_owner_receives_a_private_identifiable_snapshot()
         default_locale: "ru".into(),
         ssh: Default::default(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
     };
     let mut bot = Bot::new(config).unwrap();
     let update = |id: u64, kind: &str| json!({"update_id":1,"message":{"from":{"id":id,"is_bot":false},"chat":{"id":id,"type":kind},"text":"/status"}});
@@ -81,6 +82,7 @@ async fn language_selection_survives_restart_and_all_locales_render_unicode_stat
         default_locale: "en".into(),
         ssh: Default::default(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
     };
     let command = |text: &str| json!({"message":{"from":{"id":123456789,"is_bot":false},"chat":{"id":123456789,"type":"private"},"text":text}});
     let mut bot = Bot::new(config.clone()).unwrap();
@@ -147,6 +149,7 @@ async fn identity_in_message_text_and_an_untrusted_chat_never_grant_access() {
         default_locale: "en".into(),
         ssh: Default::default(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
     };
     let mut bot = Bot::new(config).unwrap();
     for update in [
@@ -274,6 +277,7 @@ async fn owner_can_queue_one_health_reply_under_outbox_pressure() {
             serde_json::from_str(include_str!("../../../fixtures/contracts/event.json")).unwrap();
         let replies: Vec<_> = (0..32)
             .map(|i| Reply {
+                envelope: Default::default(),
                 locale: None,
                 chat_id: (123450000 + i).to_string(),
                 text: "queued event".into(),

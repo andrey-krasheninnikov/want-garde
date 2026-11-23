@@ -677,6 +677,7 @@ async fn publish_at(database: &Database, id: String, ip: String, at: i64) {
             s.publish(
                 &event(&id, &ip),
                 &[garde_daemon::Reply {
+                    envelope: Default::default(),
                     locale: None,
                     chat_id: "123456789".into(),
                     text: "Observation".into(),
@@ -887,6 +888,7 @@ async fn overdue_critical_event_reaches_telegram_transport_while_geoip_provider_
             s.publish(
                 &event,
                 &[garde_daemon::Reply {
+                    envelope: Default::default(),
                     locale: Some("en".into()),
                     chat_id: "123456789".into(),
                     text: "Critical event".into(),

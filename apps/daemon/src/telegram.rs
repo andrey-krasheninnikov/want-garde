@@ -74,7 +74,7 @@ impl Telegram {
         if status == 409 {
             return Err(TransportError::fatal("telegram.conflict"));
         }
-        if method == "sendMessage" && matches!(status, 400 | 403) {
+        if matches!(method, "sendMessage" | "getChat") && matches!(status, 400 | 403) {
             return Err(TransportError::recipient(if status == 403 {
                 "telegram.forbidden"
             } else {
@@ -115,7 +115,7 @@ impl Telegram {
                 TransportError::fatal("telegram.unauthorized")
             } else if body["error_code"] == 409 {
                 TransportError::fatal("telegram.conflict")
-            } else if method == "sendMessage"
+            } else if matches!(method, "sendMessage" | "getChat")
                 && matches!(body["error_code"].as_u64(), Some(400 | 403))
             {
                 TransportError::recipient(if body["error_code"] == 403 {
@@ -184,23 +184,65 @@ impl Transport for Telegram {
         if reply.text.encode_utf16().count() > 4096 {
             return Err(TransportError::recipient("telegram.message_size"));
         }
+        let topic_id = reply.envelope.topic_id;
+        let expected_chat = reply
+            .chat_id
+            .parse::<i64>()
+            .ok()
+            .filter(|_| garde_config::valid_notification_destination(&reply.chat_id, topic_id))
+            .ok_or_else(|| TransportError::recipient("delivery.invalid"))?;
+        let mut payload = json!({
+            "chat_id": reply.chat_id,
+            "text": reply.text,
+            "entities": [{"type":"pre","offset":0,"length":reply.text.trim_end().encode_utf16().count()}],
+            "disable_notification": reply.envelope.silent,
+            "protect_content": reply.envelope.protect_content,
+        });
+        let forum = expected_chat < 0;
+        if forum {
+            // Telegram can ignore a thread ID when the chat is not a forum.
+            let chat = self
+                .call("getChat", json!({"chat_id": reply.chat_id}))
+                .await
+                .map_err(|mut error| {
+                    error.uncertain = false;
+                    forum_error(error)
+                })?;
+            if chat["id"].as_i64() != Some(expected_chat) {
+                let mut error = TransportError::transient("telegram.forum_response");
+                error.uncertain = false;
+                return Err(error);
+            }
+            if chat["type"] != "supergroup" || chat["is_forum"] != true {
+                return Err(TransportError::recipient("telegram.forum_required"));
+            }
+        }
+        if let Some(topic_id) = topic_id {
+            payload["message_thread_id"] = json!(topic_id);
+        }
         let result = self
-            .call(
-                "sendMessage",
-                json!({"chat_id":reply.chat_id,"text":reply.text,"entities":[{"type":"pre","offset":0,"length":reply.text.trim_end().encode_utf16().count()}],"protect_content":false}),
-            )
-            .await?;
+            .call("sendMessage", payload)
+            .await
+            .map_err(|error| if forum { forum_error(error) } else { error })?;
         if result["message_id"].as_i64().is_none()
-            || result["chat"]["id"]
-                .as_u64()
-                .map(|n| n.to_string())
-                .as_deref()
-                != Some(reply.chat_id.as_str())
+            || result["chat"]["id"].as_i64() != Some(expected_chat)
         {
             return Err(TransportError::transient("telegram.response"));
         }
+        if forum && result["message_thread_id"].as_i64() != topic_id.map(i64::from) {
+            return Err(TransportError::transient("telegram.forum_response"));
+        }
         Ok(())
     }
+}
+
+fn forum_error(mut error: TransportError) -> TransportError {
+    error.code = match error.code {
+        "telegram.bad_request" => "telegram.forum_topic",
+        "telegram.forbidden" => "telegram.forum_forbidden",
+        code => code,
+    };
+    error
 }
 
 fn client(https_only: bool) -> Result<Client, TransportError> {
@@ -305,6 +347,7 @@ mod tests {
         assert_eq!(api.identity().await.unwrap().username, "test_bot");
         assert_eq!(api.updates(42).await.unwrap()[0]["update_id"], 42);
         api.send(&Reply {
+            envelope: Default::default(),
             locale: None,
             chat_id: "123456789".into(),
             text: "שלום <host> مرحبا 🛡".into(),
@@ -321,6 +364,98 @@ mod tests {
             json!([{"type":"pre","offset":0,"length":20}])
         );
         assert_ne!(observed[3].1["protect_content"], true);
+    }
+
+    fn forum_reply(topic_id: Option<i32>) -> Reply {
+        Reply {
+            locale: None,
+            chat_id: "-1001234567890".into(),
+            text: "حدث".into(),
+            envelope: crate::DeliveryEnvelope {
+                topic_id,
+                silent: true,
+                protect_content: true,
+                redacted: true,
+            },
+        }
+    }
+
+    fn forum_chat(enabled: bool) -> Value {
+        json!({"ok":true,"result":{"id":-1001234567890_i64,"type":"supergroup","is_forum":enabled}})
+    }
+
+    #[tokio::test]
+    async fn sends_to_the_signed_forum_chat_and_only_the_configured_topic() {
+        let (api, worker) = server(vec![
+            (200, forum_chat(true)),
+            (
+                200,
+                json!({"ok":true,"result":{"message_id":1,"chat":{"id":-1001234567890_i64},"message_thread_id":42}}),
+            ),
+            (200, forum_chat(true)),
+            (
+                200,
+                json!({"ok":true,"result":{"message_id":2,"chat":{"id":-1001234567890_i64}}}),
+            ),
+        ]);
+        api.send(&forum_reply(Some(42))).await.unwrap();
+        api.send(&forum_reply(None)).await.unwrap();
+
+        let observed = worker.join().unwrap();
+        assert!(observed[0].0.starts_with("POST /getChat "));
+        assert_eq!(observed[0].1, json!({"chat_id":"-1001234567890"}));
+        assert!(observed[1].0.starts_with("POST /sendMessage "));
+        assert_eq!(
+            observed[1].1,
+            json!({
+                "chat_id":"-1001234567890","text":"حدث",
+                "disable_notification":true,"protect_content":true,
+                "entities":[{"type":"pre","offset":0,"length":3}],"message_thread_id":42
+            }),
+        );
+        assert!(observed[2].0.starts_with("POST /getChat "));
+        assert!(observed[3].0.starts_with("POST /sendMessage "));
+        assert!(observed[3].1.get("message_thread_id").is_none());
+    }
+
+    #[tokio::test]
+    async fn forum_rejection_does_not_send_to_general_or_prevent_a_private_send() {
+        let (api, worker) = server(vec![
+            (200, forum_chat(false)),
+            (200, forum_chat(true)),
+            (
+                400,
+                json!({"ok":false,"description":"private_remote_description"}),
+            ),
+            (
+                200,
+                json!({"ok":true,"result":{"message_id":3,"chat":{"id":123456789}}}),
+            ),
+        ]);
+        let error = api.send(&forum_reply(None)).await.unwrap_err();
+        assert_eq!(error.kind, FailureKind::Recipient);
+        assert_eq!(error.code, "telegram.forum_required");
+        let error = api.send(&forum_reply(Some(42))).await.unwrap_err();
+        assert_eq!(error.kind, FailureKind::Recipient);
+        assert_eq!(error.code, "telegram.forum_topic");
+        assert!(!format!("{error:?}").contains("private_remote_description"));
+        api.send(&Reply {
+            locale: None,
+            chat_id: "123456789".into(),
+            text: "Private".into(),
+            envelope: Default::default(),
+        })
+        .await
+        .unwrap();
+
+        let observed = worker.join().unwrap();
+        assert!(observed[0].0.starts_with("POST /getChat "));
+        assert!(observed[1].0.starts_with("POST /getChat "));
+        assert_eq!(observed[2].1["message_thread_id"], 42);
+        assert_eq!(observed[3].1["chat_id"], "123456789");
+        assert!(observed[3].1.get("message_thread_id").is_none());
+        assert_eq!(observed[3].1["disable_notification"], false);
+        assert_eq!(observed[3].1["protect_content"], false);
     }
 
     #[tokio::test]
@@ -353,6 +488,7 @@ mod tests {
             )]);
             let error = api
                 .send(&Reply {
+                    envelope: Default::default(),
                     locale: None,
                     chat_id: "123456789".into(),
                     text: "result".into(),
@@ -370,6 +506,7 @@ mod tests {
         )]);
         let error = api
             .send(&Reply {
+                envelope: Default::default(),
                 locale: None,
                 chat_id: "123456789".into(),
                 text: "result".into(),
@@ -385,6 +522,7 @@ mod tests {
         )]);
         let error = api
             .send(&Reply {
+                envelope: Default::default(),
                 locale: None,
                 chat_id: "123456789".into(),
                 text: "result".into(),

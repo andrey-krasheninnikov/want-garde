@@ -72,7 +72,7 @@ SupplementaryGroups=adm
 
 ### Совместимость и откат
 
-SQLite user_version остаётся 1. Новые источники используют отдельные versioned meta-записи, SSH checkpoint и старые DTO сохраняют формат; SshHealth остаётся alias общей SourceHealth. Старый бинарник может продолжать доставку существующей очереди и игнорировать новые meta, но не собирает новые источники. Если в конфигурацию добавлены новые поля, перед возвратом старого бинарника восстановите совместимую копию конфигурации.
+Источники используют отдельные versioned meta-записи. SSH checkpoint и старые DTO сохраняют формат, а SshHealth остаётся alias общей SourceHealth. Совместимость базы и конфигурации при откате описана в [документации доставки](delivery.md).
 
 При откате остановите новый daemon и task-owned helper socket/instances, восстановите прежние current, units и drop-in, выполните daemon-reload и запустите прежний сервис. Сохраняйте новые данные и закрытый backup; не пересоздавайте SQLite. Полная Linux-матрица относится к #32. Native runtime подтверждается отдельно от локальных tests и синтетических parser fixtures.
 
@@ -108,7 +108,7 @@ The Ubuntu drop-in above grants the service access to every adm-readable log, wh
 
 ### Compatibility and rollback
 
-SQLite user_version stays 1. New collectors use independent versioned meta entries; SSH checkpoint/DTO shapes remain compatible, with SshHealth retained as an alias of shared SourceHealth. An older binary can deliver the existing queue and ignore new meta, but suspends the new collectors. Restore compatible configuration before using an older binary if new fields were added.
+Collectors use independent versioned meta entries. The SSH checkpoint and existing DTO shapes stay the same, with SshHealth retained as an alias of the shared SourceHealth. See [delivery and recovery](delivery.md) for database and configuration compatibility on rollback.
 
 For rollback, stop the new daemon and installation-owned helper socket/instances, restore the previous current pointer, units and drop-in, reload systemd and restart the previous service. Retain new data and the private backup; never recreate SQLite. The complete Linux matrix belongs to #32. Native runtime evidence is separate from local tests and synthetic parser fixtures.
 

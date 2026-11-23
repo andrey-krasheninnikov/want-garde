@@ -20,6 +20,7 @@ async fn first_run_starts_at_tail_and_new_login_survives_restart_without_duplica
     let config = Config {
         server_id: Id::new("server-demo").unwrap(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         fail2ban: Default::default(),
@@ -64,6 +65,7 @@ async fn six_ssh_events_ignore_other_programs_and_do_not_copy_untrusted_log_tail
     let config = Config {
         server_id: Id::new("server-demo").unwrap(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         fail2ban: Default::default(),
@@ -129,6 +131,7 @@ async fn rotation_keeps_unread_and_late_old_file_records_across_restart() {
     let config = Config {
         server_id: Id::new("server-demo").unwrap(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         fail2ban: Default::default(),
@@ -183,6 +186,7 @@ async fn restart_recovers_intermediate_rotations_and_reports_uncertain_coverage(
         let config = Config {
             server_id: Id::new("server-demo").unwrap(),
             owner_user_id: Some("123456789".into()),
+            notifications: Default::default(),
             bot_token_file: dir.path().join("token"),
             state_dir: dir.path().into(),
             fail2ban: Default::default(),
@@ -256,6 +260,7 @@ async fn truncate_regrow_and_incomplete_or_oversized_records_leave_following_eve
     let config = Config {
         server_id: Id::new("server-demo").unwrap(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         fail2ban: Default::default(),
@@ -352,6 +357,7 @@ async fn journal_cursor_recovery_reports_gap_and_deduplicates_replay() {
     let config = Config {
         server_id: Id::new("server-demo").unwrap(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         fail2ban: Default::default(),
@@ -423,6 +429,7 @@ async fn local_diagnostics_are_read_only_without_token_and_access_failure_remain
     let config = Config {
         server_id: Id::new("server-demo").unwrap(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
         bot_token_file: dir.path().join("absent-token"),
         state_dir: dir.path().into(),
         fail2ban: Default::default(),
@@ -475,6 +482,7 @@ async fn failed_checkpoint_commit_keeps_the_record_available_for_retry() {
     let config = Config {
         server_id: Id::new("server-demo").unwrap(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         fail2ban: Default::default(),
@@ -519,6 +527,7 @@ async fn repeated_failed_registration_does_not_keep_removed_log_files_open() {
     let config = Config {
         server_id: Id::new("server-demo").unwrap(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         fail2ban: Default::default(),
@@ -583,6 +592,7 @@ async fn an_unavailable_rotated_file_produces_a_persistent_gap_and_new_events_co
     let config = Config {
         server_id: Id::new("server-demo").unwrap(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         fail2ban: Default::default(),
@@ -628,6 +638,7 @@ async fn a_future_checkpoint_version_is_preserved_and_blocks_recovery_before_que
     let config = Config {
         server_id: Id::new("server-demo").unwrap(),
         owner_user_id: Some("123456789".into()),
+        notifications: Default::default(),
         bot_token_file: dir.path().join("token"),
         state_dir: dir.path().into(),
         fail2ban: Default::default(),

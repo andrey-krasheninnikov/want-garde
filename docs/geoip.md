@@ -49,7 +49,7 @@ want-garde-daemon --geoip-status --config /etc/want-garde/config.json
 want-garde-daemon --geoip-event EVENT_ID --config /etc/want-garde/config.json
 ```
 
-Они выводят JSON: exit 0 для успешного чтения либо готового/отключённого GeoIP, exit 1 для внимания в статусе, exit 2 для ошибки входа или хранилища. При первом обновлении daemon создаёт дополнительные таблицы в schema 1. Старые конфигурации читаются с выключенным GeoIP. Откат использует прежние binaries и совместимую конфигурацию, сохраняя текущую базу и незавершённые доставки. Новые таблицы остаются; старый daemon их не исполняет.
+Они выводят JSON: exit 0 для успешного чтения либо готового/отключённого GeoIP, exit 1 для внимания в статусе, exit 2 для ошибки входа или хранилища. Старые конфигурации читаются с выключенным GeoIP. Уведомления с режимом `redacted` не показывают GeoIP и подсказку команды. Обновление базы и откат описаны в [документации доставки](delivery.md).
 
 ## English
 
@@ -86,4 +86,4 @@ States are `missing` with a reason, `retrieved` for a fetched result and `cached
 
 The local commands shown above read the database without claiming the writer, making HTTP requests or reading the token. They emit JSON: exit 0 for a successful event read or ready/disabled status, exit 1 for status requiring attention, and exit 2 for input or storage failure.
 
-The daemon adds tables to schema 1 on first startup. Old configurations default to disabled GeoIP. Rollback uses previous binaries and a compatible configuration while preserving the current database and unfinished deliveries. New tables remain; the old daemon does not execute their pending work.
+Old configurations default to disabled GeoIP. Redacted notifications omit GeoIP and the command hint. See [delivery and recovery](delivery.md) for database upgrade and rollback.

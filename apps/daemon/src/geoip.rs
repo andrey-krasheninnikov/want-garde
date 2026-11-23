@@ -625,7 +625,7 @@ pub(crate) fn render_notification(body: &str, context: &EventGeoIp, locale: &str
 
 pub(crate) fn prepare_delivery(connection: &Connection, delivery: &mut Delivery) -> Result<()> {
     let saved: Option<(String, String, String)> = sql(connection.query_row(
-        "SELECT w.locale,w.body,g.payload FROM geoip_deliveries w JOIN deliveries d ON d.id=w.delivery_id JOIN geoip_context g ON g.event_id=d.event_id WHERE w.delivery_id=?1 AND d.attempts=0",
+        "SELECT w.locale,w.body,g.payload FROM geoip_deliveries w JOIN deliveries d ON d.id=w.delivery_id JOIN geoip_context g ON g.event_id=d.event_id WHERE w.delivery_id=?1 AND d.attempts=0 AND d.redacted=0",
         [delivery.id],
         |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
     ).optional())?;
