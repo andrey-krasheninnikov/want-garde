@@ -58,6 +58,12 @@ impl Database {
                         return;
                     }
                 };
+                if config.notification_policy.is_some()
+                    && let Err(code) = store.enable_notification_policy()
+                {
+                    let _ = ready.send(Err(code));
+                    return;
+                }
                 store.geoip_config = Some(config.clone());
                 if let Err(code) = store.recover_geoip(now()) {
                     let _ = ready.send(Err(code));

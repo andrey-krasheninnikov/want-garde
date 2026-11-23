@@ -21,7 +21,7 @@
 **hours** задаёт окно подсчёта (24 часа по умолчанию). В пропущенный при переводе часов
 момент используется первое доступное время того же дня. При повторённом времени выбирается
 первое наступление. Сводка создаётся один раз для даты и получателя. Очередь принимает
-пропущенные сводки с событиями в пределах срока хранения.
+пропущенные сводки в пределах срока хранения.
 
 **live** включает оперативную сводку для событий с **aggregate**. По умолчанию окно 300 секунд
 и порог три события. Готовые сводки ждут окончания тишины. Маршруты **summary.daily** и
@@ -49,7 +49,7 @@ live summaries. Suppressing an immediate notification preserves the original eve
 **hours** sets the lookback, defaulting to 24. If a clock change skips the configured minute,
 the summary is due at the first valid minute on that date. The earlier occurrence is used
 when the minute repeats. A summary is queued once per date and recipient. Missed summaries
-catch up for dates with events within retention.
+catch up within the configured retention period.
 
 **live** enables live summaries for rules with **aggregate**. The defaults are a 300-second
 window and a minimum of three events. Summaries wait until quiet hours end. Use **summary.daily**

@@ -442,3 +442,29 @@ async fn summary_retries_after_queue_quota_and_restart_without_losing_its_place(
         .unwrap();
     assert!(claim(&db, due + 2).await.is_empty());
 }
+
+#[tokio::test]
+async fn an_empty_daily_summary_queued_during_quiet_hours_survives_midnight() {
+    let dir = private_dir();
+    let config = config(
+        dir.path(),
+        json!({
+            "default_preferences":{"daily":{"at":"23:30"},"quiet_hours":["22:00-07:00"]},
+            "recipients":{"123456788":{}}
+        }),
+    );
+    let db = open(config.clone()).await;
+    let due = at("2026-01-05T23:30:00Z");
+    db.call(move |s| s.tick_notifications(due)).await.unwrap();
+    assert!(claim(&db, due).await.is_empty());
+    drop(db);
+    let db = open(config).await;
+    let release = at("2026-01-06T07:00:00Z");
+    db.call(move |s| s.tick_notifications(release))
+        .await
+        .unwrap();
+    let summaries = claim(&db, release).await;
+    assert_eq!(summaries.len(), 1);
+    assert!(summaries[0].text.contains("Events: 0"));
+    assert!(summaries[0].text.contains("2026-01-05T23:30:00"));
+}

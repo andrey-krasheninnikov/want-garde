@@ -15,6 +15,7 @@ pub struct Store {
     pub(crate) geoip_config: Option<garde_config::Config>,
     pub(crate) retention: garde_config::Retention,
     last_result_sweep: Option<i64>,
+    notification_tables: bool,
     _lock: File,
 }
 pub struct Delivery {
@@ -232,7 +233,11 @@ impl Store {
         sql(connection.execute("UPDATE deliveries SET state='pending',uncertain=1,last_error='delivery.uncertain' WHERE state='in_flight'",[]))?;
         crate::geoip::initialize(&connection)?;
         crate::retention::initialize(&connection)?;
-        crate::notification_policy::initialize(&connection)?;
+        let notification_tables: bool = sql(connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name='notification_daily')",
+            [],
+            |row| row.get(0),
+        ))?;
         if let Err(code) = crate::retention::recover_result_writes(&directory) {
             eprintln!("{code}");
         }
@@ -241,8 +246,15 @@ impl Store {
             connection,
             retention,
             last_result_sweep: None,
+            notification_tables,
             _lock: lock,
         })
+    }
+
+    pub(crate) fn enable_notification_policy(&mut self) -> Result<()> {
+        crate::notification_policy::initialize(&self.connection)?;
+        self.notification_tables = true;
+        Ok(())
     }
 
     pub fn offset(&self) -> Result<i64> {
@@ -672,33 +684,49 @@ impl Store {
         sql(transaction.execute("UPDATE deliveries SET state='dead_letter',last_error=CASE WHEN expires_at<=?1 THEN 'delivery.expired' ELSE 'delivery.exhausted' END,updated_at=?1 WHERE id IN (SELECT id FROM deliveries WHERE state='pending' AND (expires_at<=?1 OR attempts>=128) LIMIT 100)",[now]))?;
         let (quiet, critical_only) =
             crate::notification_policy::quiet_chats(self.geoip_config.as_ref(), now)?;
-        let mut value = sql(transaction.query_row(
+        let all_parameters: [&dyn rusqlite::ToSql; 3] = [&now, &quiet, &critical_only];
+        let (quiet_clause, parameters) = if quiet == "[]" && critical_only == "[]" {
+            ("", &all_parameters[..1])
+        } else {
+            (
+                "AND (d.event_id IS NULL OR (
+                 d.chat_id NOT IN (SELECT value FROM json_each(?2))
+                 AND (d.chat_id NOT IN (SELECT value FROM json_each(?3))
+                      OR COALESCE(
+                          (SELECT critical FROM notification_priority WHERE delivery_id=d.id),
+                          (SELECT json_extract(payload,'$.classification.severity')='critical' FROM events WHERE id=d.event_id),
+                          0))))",
+                all_parameters.as_slice(),
+            )
+        };
+        let statement = format!(
             "SELECT id,chat_id,text,attempts,topic_id,silent,protect_content,redacted
              FROM deliveries d WHERE state='pending' AND next_at<=?1 AND expires_at>?1 AND attempts<128
              AND NOT EXISTS(SELECT 1 FROM deliveries a WHERE a.chat_id=d.chat_id AND a.state='in_flight')
              AND NOT EXISTS(SELECT 1 FROM cooldowns c WHERE c.chat_id=d.chat_id AND c.until_at>?1)
-             AND (d.event_id IS NULL OR (
-                 d.chat_id NOT IN (SELECT value FROM json_each(?2))
-                 AND (d.chat_id NOT IN (SELECT value FROM json_each(?3))
-                      OR EXISTS(SELECT 1 FROM notification_critical WHERE delivery_id=d.id))))
-             ORDER BY next_at,id LIMIT 1",
-            params![now, quiet, critical_only],
-            |r| Ok(Delivery {
-                id: r.get(0)?,
-                attempts: r.get::<_,u32>(3)? + 1,
-                reply: Reply {
-                    locale: None,
-                    chat_id: r.get(1)?,
-                    text: r.get(2)?,
-                    envelope: DeliveryEnvelope {
-                        topic_id: r.get(4)?,
-                        silent: r.get(5)?,
-                        protect_content: r.get(6)?,
-                        redacted: r.get(7)?,
+             {quiet_clause}
+             ORDER BY next_at,id LIMIT 1");
+        let mut statement_handle = sql(transaction.prepare_cached(&statement))?;
+        let mut value = sql(statement_handle
+            .query_row(parameters, |r| {
+                Ok(Delivery {
+                    id: r.get(0)?,
+                    attempts: r.get::<_, u32>(3)? + 1,
+                    reply: Reply {
+                        locale: None,
+                        chat_id: r.get(1)?,
+                        text: r.get(2)?,
+                        envelope: DeliveryEnvelope {
+                            topic_id: r.get(4)?,
+                            silent: r.get(5)?,
+                            protect_content: r.get(6)?,
+                            redacted: r.get(7)?,
+                        },
                     },
-                },
-            }),
-        ).optional())?;
+                })
+            })
+            .optional())?;
+        drop(statement_handle);
         if let Some(value) = &mut value {
             crate::geoip::prepare_delivery(&transaction, value)?;
             sql(transaction.execute("UPDATE deliveries SET state='in_flight',attempts=attempts+1,updated_at=?1,next_at=?3 WHERE id=?2",params![now,value.id,now.saturating_add(backoff(value.attempts) as i64)]))?;
@@ -842,7 +870,9 @@ impl Store {
             params![cutoff, pressure],
         ))?;
         let events=sql(transaction.execute("DELETE FROM events WHERE id IN (SELECT id FROM events e WHERE NOT EXISTS(SELECT 1 FROM deliveries d WHERE d.event_id=e.id) AND (created_at<?1 OR ?2 OR (SELECT count(*) FROM events)>20000) ORDER BY created_at,id LIMIT 16)",params![cutoff,pressure]))?;
-        crate::notification_policy::prune(&transaction, cutoff, now)?;
+        if self.notification_tables {
+            crate::notification_policy::prune(&transaction, cutoff, now)?;
+        }
         let audit = crate::retention::prune_audit(&transaction, self.retention, now, pressure)?;
         if removed + events + audit > 0 {
             sql(transaction.execute("UPDATE meta SET value=min(4294967295,CAST(value AS INTEGER)+?1) WHERE key='pruned'",[(removed+events+audit) as i64]))?;
@@ -1090,7 +1120,9 @@ fn enqueue_event(
     let context = crate::geoip::record(transaction, event, config, now)?;
     let owner = config.and_then(|config| config.owner_user_id.as_deref());
     for reply in replies {
-        let mut critical = false;
+        let original_critical =
+            event.classification.severity == garde_contracts::Severity::Critical;
+        let mut critical = original_critical;
         if let Some(policy) = config.and_then(|c| c.notification_policy.as_ref()) {
             let Some(severity) =
                 crate::notification_policy::select(transaction, policy, event, reply, now)?
@@ -1134,8 +1166,11 @@ fn enqueue_event(
             86400,
         )?;
         let id = transaction.last_insert_rowid();
-        if critical {
-            sql(transaction.execute("INSERT INTO notification_critical VALUES(?1)", [id]))?;
+        if critical != original_critical {
+            sql(transaction.execute(
+                "INSERT INTO notification_priority VALUES(?1,?2)",
+                params![id, critical],
+            ))?;
         }
         if context.is_some_and(|c| c.reason_key.as_str() == "geoip_pending") {
             sql(transaction.execute(

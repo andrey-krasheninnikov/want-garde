@@ -23,8 +23,9 @@ pub(crate) fn initialize(connection: &Connection) -> Result<()> {
             closed INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY(chat_id,start_at,end_at));
          CREATE INDEX IF NOT EXISTS notification_buckets_due ON notification_buckets(end_at);
-         CREATE TABLE IF NOT EXISTS notification_critical(
-            delivery_id INTEGER PRIMARY KEY REFERENCES deliveries(id) ON DELETE CASCADE);
+         CREATE TABLE IF NOT EXISTS notification_priority(
+            delivery_id INTEGER PRIMARY KEY REFERENCES deliveries(id) ON DELETE CASCADE,
+            critical INTEGER NOT NULL CHECK(critical IN(0,1)));
          CREATE TABLE IF NOT EXISTS notification_daily(
             chat_id TEXT PRIMARY KEY, last_date TEXT NOT NULL);",
     ))
@@ -294,6 +295,33 @@ fn next_date(last: &str) -> Result<NaiveDate> {
         .ok_or("storage.corrupt")
 }
 
+fn daily_slot(
+    pref: &NotificationPreferences,
+    mut date: NaiveDate,
+    cutoff: i64,
+) -> Result<(NaiveDate, i64)> {
+    for _ in 0..4 {
+        if let Some(at) = pref.scheduled_at(date)
+            && at > cutoff
+        {
+            return Ok((date, at));
+        }
+        date = date.succ_opt().ok_or("service.clock")?;
+    }
+    Err("service.clock")
+}
+
+fn daily_date(last: Option<&str>, today: NaiveDate, retention_days: u16) -> Result<NaiveDate> {
+    let oldest = today
+        .checked_sub_days(Days::new(u64::from(retention_days)))
+        .ok_or("service.clock")?;
+    Ok(last
+        .map(next_date)
+        .transpose()?
+        .unwrap_or(today)
+        .max(oldest))
+}
+
 impl Store {
     pub fn tick_notifications(&mut self, now: i64) -> Result<()> {
         let Some(config) = self
@@ -348,35 +376,20 @@ impl Store {
                 |r| r.get(0),
             )
             .optional())?;
-        let mut date = if let Some(last) = last {
-            next_date(&last)?
-        } else {
+        let date = daily_date(last.as_deref(), today, self.retention.event_days)?;
+        if last.is_none() {
             let yesterday = today.pred_opt().ok_or("service.clock")?;
             sql(self.connection.execute(
                 "INSERT INTO notification_daily VALUES (?1,?2)",
                 params![reply.chat_id, yesterday.to_string()],
             ))?;
-            today
-        };
-        if pref.quiet(now) || date > today {
+        }
+        if date > today {
             return Ok(());
         }
-        let oldest = today
-            .checked_sub_days(Days::new(u64::from(self.retention.event_days)))
-            .ok_or("service.clock")?;
-        if date < oldest {
-            date = oldest;
-        }
-        let Some(at) = pref.scheduled_at(date) else {
-            if date < today {
-                sql(self.connection.execute(
-                    "UPDATE notification_daily SET last_date=?2 WHERE chat_id=?1",
-                    params![reply.chat_id, date.to_string()],
-                ))?;
-            }
-            return Ok(());
-        };
         let timestamp = now.timestamp();
+        let cutoff = timestamp.saturating_sub(i64::from(self.retention.event_days) * 86400);
+        let (date, at) = daily_slot(pref, date, cutoff)?;
         if at > timestamp {
             return Ok(());
         }
@@ -386,13 +399,11 @@ impl Store {
             &tx,
             policy,
             &reply.chat_id,
-            at.saturating_sub(i64::from(daily.hours) * 3600),
+            at.saturating_sub(i64::from(daily.hours) * 3600).max(cutoff),
             at,
         )?;
-        if total > 0 || date == today {
-            summary_text(&mut reply, "daily", total, at)?;
-            persist_summary(&tx, config, &reply, "daily", (at, at), timestamp)?;
-        }
+        summary_text(&mut reply, "daily", total, at)?;
+        persist_summary(&tx, config, &reply, "daily", (at, at), timestamp)?;
         sql(tx.execute(
             "UPDATE notification_daily SET last_date=?2 WHERE chat_id=?1",
             params![reply.chat_id, date.to_string()],
@@ -407,7 +418,7 @@ impl Store {
         mut reply: Reply,
         now: DateTime<Utc>,
     ) -> Result<()> {
-        if pref.live.is_none() || pref.quiet(now) {
+        if pref.live.is_none() {
             return Ok(());
         }
         let timestamp = now.timestamp();
@@ -509,22 +520,16 @@ pub(crate) fn render_status(
                     |r| r.get(0),
                 )
                 .optional())?;
-            let next = last
-                .as_deref()
-                .map(next_date)
-                .transpose()?
-                .unwrap_or(local_today);
-            if let Some(due) = pref
-                .scheduled_at(next)
-                .and_then(|stamp| DateTime::<Utc>::from_timestamp(stamp, 0))
-            {
-                let _ = write!(
-                    text,
-                    "\n{}: {}",
-                    message(locale, "notification_daily"),
-                    crate::isolate(&due.with_timezone(&pref.time_zone).to_rfc3339())
-                );
-            }
+            let next = daily_date(last.as_deref(), local_today, config.retention.event_days)?;
+            let cutoff = now.saturating_sub(i64::from(config.retention.event_days) * 86400);
+            let (_, stamp) = daily_slot(pref, next, cutoff)?;
+            let due = DateTime::<Utc>::from_timestamp(stamp, 0).ok_or("service.clock")?;
+            let _ = write!(
+                text,
+                "\n{}: {}",
+                message(locale, "notification_daily"),
+                crate::isolate(&due.with_timezone(&pref.time_zone).to_rfc3339())
+            );
         }
         if let Some(live) = &pref.live {
             let _ = write!(
