@@ -224,13 +224,13 @@ impl Transport for Telegram {
             .call("sendMessage", payload)
             .await
             .map_err(|error| if forum { forum_error(error) } else { error })?;
-        if result["message_id"].as_i64().is_none()
+        if result["message_id"].as_i64().is_none_or(|id| id <= 0)
             || result["chat"]["id"].as_i64() != Some(expected_chat)
         {
             return Err(TransportError::transient("telegram.response"));
         }
         if forum && result["message_thread_id"].as_i64() != topic_id.map(i64::from) {
-            return Err(TransportError::transient("telegram.forum_response"));
+            return Err(TransportError::recipient("telegram.forum_response"));
         }
         Ok(())
     }
@@ -456,6 +456,38 @@ mod tests {
         assert!(observed[3].1.get("message_thread_id").is_none());
         assert_eq!(observed[3].1["disable_notification"], false);
         assert_eq!(observed[3].1["protect_content"], false);
+    }
+
+    #[tokio::test]
+    async fn successful_send_to_the_wrong_thread_is_terminal_but_incomplete_ack_can_retry() {
+        let chat = json!({"id":-1001234567890_i64});
+        for (result, kind, code) in [
+            (
+                json!({"message_id":1,"chat":chat,"message_thread_id":43}),
+                FailureKind::Recipient,
+                "telegram.forum_response",
+            ),
+            (
+                json!({"message_id":1,"chat":chat}),
+                FailureKind::Recipient,
+                "telegram.forum_response",
+            ),
+            (
+                json!({"chat":chat,"message_thread_id":42}),
+                FailureKind::Retry,
+                "telegram.response",
+            ),
+        ] {
+            let (api, worker) = server(vec![
+                (200, forum_chat(true)),
+                (200, json!({"ok":true,"result":result})),
+            ]);
+            let error = api.send(&forum_reply(Some(42))).await.unwrap_err();
+            assert_eq!(error.kind, kind);
+            assert_eq!(error.code, code);
+            assert_eq!(error.uncertain, kind == FailureKind::Retry);
+            assert_eq!(worker.join().unwrap()[1].1["message_thread_id"], 42);
+        }
     }
 
     #[tokio::test]

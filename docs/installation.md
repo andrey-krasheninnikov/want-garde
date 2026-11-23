@@ -62,7 +62,7 @@ sudo systemctl restart want-garde.service
 
 Сетевые ошибки polling повторяются с backoff 1..30 s с учётом Telegram retry_after. Ошибки токена, webhook и конфликт polling останавливают процесс. События, ответы и polling offset сохраняются в SQLite до отправки. Неоднозначная отправка может повториться с тем же ID. Срок доставки события: 24 часа; ответа: 10 минут. См. [доставку, диагностику и ограничения](delivery.md).
 
-Для отката первой неуспешной установки остановите и отключите только `want-garde.service`; сохраните конфигурацию и токен для исправления. При последующих ручных обновлениях сначала сохраните предыдущий SHA и файлы, остановите сервис, переключите `current` на проверенную сборку и проверьте запуск. Совместимость будущих данных и автоматический rollback требуют отдельных тикетов. Read helper устанавливается отдельно по [инструкции firewall/fail2ban](firewall.md); MCP остаётся каркасом.
+Для отката первой неуспешной установки остановите и отключите только `want-garde.service`; сохраните конфигурацию и токен для исправления. При ручных обновлениях используйте [порядок обновления и отката доставки](delivery.md#ручное-обновление-и-откат). Перед возвратом прежнего бинарника сохраните новые данные отдельно и проверьте совместимость копии `state_dir` и конфигурации. Read helper устанавливается отдельно по [инструкции firewall/fail2ban](firewall.md); MCP остаётся каркасом.
 
 ## English
 
@@ -88,7 +88,7 @@ The daemon has no root, capabilities, sudo, or Docker-socket access. Configurati
 
 Polling network failures use a 1..30-second backoff and respect Telegram retry_after. Invalid tokens, webhooks, and polling conflicts stop the process. Events, replies, and polling progress are persisted in SQLite before sending. An ambiguous send can repeat with the same ID. Events expire after 24 hours; replies after 10 minutes. See [delivery, diagnostics, and limitations](delivery.md).
 
-To roll back a failed first installation, stop and disable only `want-garde.service`, retaining configuration and token for correction. Before later manual updates, preserve the previous SHA/files, stop the service, switch `current` to a verified build, and check startup. Future data compatibility and automatic rollback require their implementation issues. Install the read helper separately using the [firewall/fail2ban instructions](firewall.md); MCP remains a scaffold.
+To roll back a failed first installation, stop and disable only `want-garde.service`, retaining configuration and token for correction. For manual updates, follow the [delivery update and rollback procedure](delivery.md#manual-update-and-rollback). Before restoring a previous binary, preserve current data separately and verify that the `state_dir` and configuration backup is compatible. Install the read helper separately using the [firewall/fail2ban instructions](firewall.md); MCP remains a scaffold.
 
 ## SSH
 

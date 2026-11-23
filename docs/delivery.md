@@ -37,7 +37,7 @@ Daemon сохраняет нормализованное событие и вс�
 
 Команды доступны только владельцу в личном чате. Входящее сообщение не добавляет получателя. Конфигурация применяется к новым уведомлениям. Доставка сохраняет чат, тему, параметры отправки и режим приватности при постановке в очередь, включая повторы и перезапуск.
 
-Отправка в форум проверяет тип чата. При отказе Telegram не пробует отправить сообщение в General или другую тему. Личные доставки выполняются независимо. В диагностике `telegram.forum_required` означает, что чат не форум, `telegram.forum_topic` означает отклонённый запрос к чату или теме, а `telegram.forum_forbidden` означает запрет доступа. [Telegram Bot API](https://core.telegram.org/bots/api#sendmessage)
+Daemon проверяет режим форума и отправляет сообщение отдельными запросами к Telegram. Если отключить форум между запросами, Telegram может отправить сообщение в чат без темы. Оставляйте режим форума включённым, пока чат используется для доставки. При отказе Telegram доставка завершается без перехода в General или другую тему. Личные доставки выполняются независимо. В диагностике `telegram.forum_required` означает, что чат не форум, `telegram.forum_topic` означает отклонённый запрос к чату или теме, `telegram.forum_forbidden` означает запрет доступа, а `telegram.forum_response` отмечает ответ с неверной темой или неполными данными проверки чата. [Telegram Bot API](https://core.telegram.org/bots/api#sendmessage)
 
 ### Гарантии и сроки
 
@@ -90,7 +90,7 @@ Events go to the locally bound owner in a private chat by default. Add private c
 
 Commands require the owner's private chat. Incoming messages grant no subscription. Configuration changes apply to new deliveries. A queued delivery uses the same chat, topic, send options and privacy mode through retries and restarts.
 
-The sender checks that the chat is a forum before sending. If Telegram rejects a topic request, the sender does not post to General or any other topic. Private deliveries continue independently. In diagnostics, `telegram.forum_required` means the chat is not a forum, `telegram.forum_topic` means Telegram rejected the chat or topic request, and `telegram.forum_forbidden` marks a permission failure. [Telegram Bot API](https://core.telegram.org/bots/api#sendmessage)
+The sender verifies forum mode and posts in separate Telegram requests. If forum mode is disabled between those requests, Telegram can post the message to the chat without a topic. Keep forum mode enabled while the chat is configured for delivery. If Telegram rejects a topic request, the delivery ends without a fallback. Private deliveries continue independently. In diagnostics, `telegram.forum_required` means the chat is not a forum, `telegram.forum_topic` means Telegram rejected the chat or topic request, `telegram.forum_forbidden` marks a permission failure, and `telegram.forum_response` marks a topic mismatch or incomplete chat verification. [Telegram Bot API](https://core.telegram.org/bots/api#sendmessage)
 
 ### Guarantees and deadlines
 

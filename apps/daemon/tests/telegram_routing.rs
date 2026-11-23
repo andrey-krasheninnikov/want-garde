@@ -302,6 +302,7 @@ async fn delivery_keeps_its_locale_privacy_and_topic_across_cold_geoip_and_resta
     );
     assert!(forum.reply.text.starts_with("Событие"));
     assert!(forum.reply.text.contains("Test network"));
+    assert!(!forum.reply.text.contains("/geoip"));
     let original = forum.reply.text;
     finish(
         &database,
@@ -325,6 +326,76 @@ async fn delivery_keeps_its_locale_privacy_and_topic_across_cold_geoip_and_resta
             .iter()
             .any(|p| p.reason_key.as_str() == "telegram.forum_topic")
     );
+}
+
+#[tokio::test]
+async fn owner_can_read_saved_context_by_extra_private_and_forum_delivery_ids() {
+    let directory = tempfile::tempdir().unwrap();
+    fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let mut config = config(directory.path());
+    config.geoip.enabled = true;
+    config.notifications.private[0].options.privacy = Some(garde_config::Privacy::Full);
+    config.notifications.forums[0].options.privacy = Some(garde_config::Privacy::Full);
+    let mut bot = Bot::new(config.clone()).unwrap();
+    let database = Database::open(config).await.unwrap();
+    let mut event = event("warm-cache", "ssh.failed");
+    event.evidence = vec![garde_contracts::Evidence {
+        name: Id::new("ip").unwrap(),
+        value: "8.8.8.8".into(),
+    }];
+    bot.publish_event(&database, event.clone()).await.unwrap();
+    assert!(
+        garde_daemon::geoip::run_once(&database, &GeoIp, now())
+            .await
+            .unwrap()
+    );
+    while let Some(delivery) = claim(&database, now()).await {
+        finish(&database, delivery.id, Outcome::Delivered).await;
+    }
+    event.id = Id::new("cached-geoip").unwrap();
+    bot.publish_event(&database, event).await.unwrap();
+    let mut references = Vec::new();
+    for chat in ["123456789", "234567890", "-1001234567890"] {
+        let delivery = claim(&database, now()).await.unwrap();
+        assert_eq!(delivery.reply.chat_id, chat);
+        assert!(delivery.reply.text.contains("Test network"));
+        if chat == "123456789" {
+            assert!(delivery.reply.text.contains("/geoip cached-geoip"));
+        } else {
+            assert!(!delivery.reply.text.contains("/geoip"));
+            references.push(
+                delivery
+                    .reply
+                    .text
+                    .lines()
+                    .last()
+                    .unwrap()
+                    .strip_prefix("ID: ")
+                    .unwrap()
+                    .to_owned(),
+            );
+        }
+        finish(&database, delivery.id, Outcome::Delivered).await;
+    }
+
+    for (update_id, reference) in references.into_iter().enumerate() {
+        let update = json!({
+            "update_id": update_id,
+            "message": {
+                "from": {"id":123456789,"is_bot":false},
+                "chat": {"id":123456789,"type":"private"},
+                "text": format!("/geoip {reference}")
+            }
+        });
+        bot.process_update(&database, &update, &Host, "test_bot")
+            .await
+            .unwrap();
+        let response = claim(&database, now()).await.unwrap();
+        assert_eq!(response.reply.chat_id, "123456789");
+        assert!(response.reply.text.contains("cached-geoip"));
+        assert!(response.reply.text.contains("Test network"));
+        finish(&database, response.id, Outcome::Delivered).await;
+    }
 }
 
 struct Host;

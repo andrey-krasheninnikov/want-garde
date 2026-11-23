@@ -1045,6 +1045,7 @@ fn enqueue_event(
     now: i64,
 ) -> Result<()> {
     let context = crate::geoip::record(transaction, event, config, now)?;
+    let owner = config.and_then(|config| config.owner_user_id.as_deref());
     for reply in replies {
         let body = &reply.text;
         let locale = reply
@@ -1059,7 +1060,12 @@ fn enqueue_event(
                 envelope: reply.envelope,
                 locale: None,
                 chat_id: reply.chat_id.clone(),
-                text: crate::geoip::render_notification(body, context, locale),
+                text: crate::geoip::render_notification(
+                    body,
+                    context,
+                    locale,
+                    owner == Some(reply.chat_id.as_str()),
+                ),
             };
             &enriched
         } else {

@@ -74,7 +74,7 @@ SupplementaryGroups=adm
 
 Источники используют отдельные versioned meta-записи. SSH checkpoint и старые DTO сохраняют формат, а SshHealth остаётся alias общей SourceHealth. Совместимость базы и конфигурации при откате описана в [документации доставки](delivery.md).
 
-При откате остановите новый daemon и task-owned helper socket/instances, восстановите прежние current, units и drop-in, выполните daemon-reload и запустите прежний сервис. Сохраняйте новые данные и закрытый backup; не пересоздавайте SQLite. Полная Linux-матрица относится к #32. Native runtime подтверждается отдельно от локальных tests и синтетических parser fixtures.
+При откате остановите новый daemon и socket и экземпляры helper этой установки. Сохраните текущие данные отдельно. Перед запуском прежнего сервиса проверьте совместимость базы по [порядку отката доставки](delivery.md#ручное-обновление-и-откат). Восстановите прежние current, units и drop-in, затем выполните daemon-reload. Полная Linux-матрица относится к #32. Native runtime подтверждается отдельно от локальных tests и синтетических parser fixtures.
 
 ## English
 
@@ -110,7 +110,7 @@ The Ubuntu drop-in above grants the service access to every adm-readable log, wh
 
 Collectors use independent versioned meta entries. The SSH checkpoint and existing DTO shapes stay the same, with SshHealth retained as an alias of the shared SourceHealth. See [delivery and recovery](delivery.md) for database and configuration compatibility on rollback.
 
-For rollback, stop the new daemon and installation-owned helper socket/instances, restore the previous current pointer, units and drop-in, reload systemd and restart the previous service. Retain new data and the private backup; never recreate SQLite. The complete Linux matrix belongs to #32. Native runtime evidence is separate from local tests and synthetic parser fixtures.
+For rollback, stop the new daemon and the helper socket and instances for this installation. Preserve current data separately. Before starting the previous service, follow the database compatibility check in [delivery rollback](delivery.md#manual-update-and-rollback). Restore the previous current pointer, units and drop-in, then reload systemd. The complete Linux matrix belongs to #32. Native runtime evidence is separate from local tests and synthetic parser fixtures.
 
 ## Platform evidence / Проверка платформ
 

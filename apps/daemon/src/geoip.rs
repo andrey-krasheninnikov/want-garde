@@ -249,7 +249,7 @@ impl Store {
             .filter(|id| *id > 0)
             .ok_or("geoip.not_found")?;
         let value: Option<String> = sql(self.connection.query_row(
-            "SELECT g.payload FROM deliveries d JOIN geoip_context g ON g.event_id=d.event_id WHERE d.id=?1 AND d.chat_id=(SELECT value FROM meta WHERE key='owner') AND NOT EXISTS(SELECT 1 FROM events WHERE id=?2)",
+            "SELECT g.payload FROM deliveries d JOIN geoip_context g ON g.event_id=d.event_id WHERE d.id=?1 AND NOT EXISTS(SELECT 1 FROM events WHERE id=?2)",
             params![delivery, reference],
             |r| r.get(0),
         ).optional())?;
@@ -615,24 +615,30 @@ impl Provider for IpInfo {
         Ok(details)
     }
 }
-pub(crate) fn render_notification(body: &str, context: &EventGeoIp, locale: &str) -> String {
-    format!(
-        "{body}\n{}\n/geoip {}",
-        render_context(context, locale),
-        context.event_id.as_str()
-    )
+pub(crate) fn render_notification(
+    body: &str,
+    context: &EventGeoIp,
+    locale: &str,
+    include_command: bool,
+) -> String {
+    let mut text = format!("{body}\n{}", render_context(context, locale));
+    if include_command {
+        text.push_str("\n/geoip ");
+        text.push_str(context.event_id.as_str());
+    }
+    text
 }
 
 pub(crate) fn prepare_delivery(connection: &Connection, delivery: &mut Delivery) -> Result<()> {
-    let saved: Option<(String, String, String)> = sql(connection.query_row(
-        "SELECT w.locale,w.body,g.payload FROM geoip_deliveries w JOIN deliveries d ON d.id=w.delivery_id JOIN geoip_context g ON g.event_id=d.event_id WHERE w.delivery_id=?1 AND d.attempts=0 AND d.redacted=0",
+    let saved: Option<(String, String, String, bool)> = sql(connection.query_row(
+        "SELECT w.locale,w.body,g.payload,d.chat_id=(SELECT value FROM meta WHERE key='owner') FROM geoip_deliveries w JOIN deliveries d ON d.id=w.delivery_id JOIN geoip_context g ON g.event_id=d.event_id WHERE w.delivery_id=?1 AND d.attempts=0 AND d.redacted=0",
         [delivery.id],
-        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
     ).optional())?;
-    if let Some((locale, body, payload)) = saved {
+    if let Some((locale, body, payload, include_command)) = saved {
         let context: EventGeoIp = decode(&payload)?;
         let text = crate::delivery::delivery_text(
-            &render_notification(&body, &context, &locale),
+            &render_notification(&body, &context, &locale, include_command),
             Some(context.event_id.as_str()),
             delivery.id,
         );
