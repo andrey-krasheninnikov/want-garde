@@ -482,6 +482,7 @@ dependencies = [
  "garde-entrypoint",
  "garde-xui",
  "hickory-proto",
+ "percent-encoding",
  "regex",
  "reqwest",
  "rusqlite",

@@ -637,6 +637,36 @@ mod tests {
         }
     }
 
+    #[test]
+    fn proxy_credentials_limit_decoded_authentication_bytes() {
+        let (_dir, path) = private_proxy_file("");
+        let egress = TelegramEgress {
+            routes: vec![TelegramRoute::Vless {
+                proxy_credentials_file: path.clone(),
+            }],
+        };
+        let configure = |authority: &str| {
+            let url = format!("socks5h://{authority}127.0.0.1:1080");
+            garde_config::atomic_write(&path, url.as_bytes(), 0o600).unwrap();
+            Telegram::with_routes("fixture-token", Some(&egress), |builder| builder)
+        };
+
+        assert!(configure("").is_ok());
+        assert!(configure(&format!("{}:%C3%A9@", "%61".repeat(231))).is_ok());
+        for invalid in [
+            "fixture-user@".to_owned(),
+            "fixture-user:@".to_owned(),
+            ":fixture-pass@".to_owned(),
+            "@".to_owned(),
+            format!("{}:%C3%A9@", "%61".repeat(232)),
+        ] {
+            assert_eq!(
+                configure(&invalid).err().unwrap().code,
+                "telegram.proxy_credentials"
+            );
+        }
+    }
+
     fn private_reply() -> Reply {
         Reply {
             envelope: Default::default(),

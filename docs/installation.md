@@ -6,7 +6,7 @@
 
 ### Подготовка
 
-Нужны systemd, исходящая HTTPS-связь с api.telegram.org и отдельный bot token. Webhook должен отсутствовать; сервис не удаляет его автоматически. Не запускайте другой polling-процесс с тем же токеном. Конфигурация проверяется до сети. Proxy-конфигурация относится к #14; текущий transport не использует proxy-переменные окружения и не меняет маршрут ОС.
+Нужны systemd, исходящая HTTPS-связь с api.telegram.org и отдельный bot token. Webhook должен отсутствовать; сервис не удаляет его автоматически. Не запускайте другой polling-процесс с тем же токеном. Конфигурация проверяется до сети. По умолчанию подключение прямое. Настройка SOCKS5, WireGuard и Tailscale описана в разделе [исходящих маршрутов Telegram](telegram-egress.md).
 
 Ручной workflow CI создаёт development artifact `linux-x86_64-<commit>` из точного SHA исходников. Автозапуск отключён; обязательные проверки выполняются локально. Это сборка Ubuntu 24.04 x86_64, без release tag и обещания совместимости с другими дистрибутивами. Получайте artifact только из workflow этого репозитория; сравните `revision` с проверенным SHA и выполните проверки контрольных сумм. Checksum подтверждает целостность, но сам по себе не подтверждает издателя.
 
@@ -70,7 +70,7 @@ The service runs on one Linux VPS with a dedicated Telegram bot token and HTTPS 
 
 ### Preparation
 
-Use systemd, outbound HTTPS access to api.telegram.org, and a dedicated token without a webhook. The service never removes a webhook automatically. Do not run another poller with the same token. Local configuration is checked before network access. Proxy configuration belongs to #14; the current transport ignores proxy environment variables and leaves OS routing unchanged.
+Use systemd, outbound HTTPS access to api.telegram.org, and a dedicated token without a webhook. The service never removes a webhook automatically. Do not run another poller with the same token. Local configuration is checked before network access. The connection is direct by default. See [Telegram egress](telegram-egress.md) to configure SOCKS5, WireGuard or Tailscale.
 
 The manual CI workflow produces a development artifact named `linux-x86_64-<commit>` from the exact source SHA. Automatic triggers are disabled; required checks run locally. It is an Ubuntu 24.04 x86_64 build, without a release tag or a compatibility promise for other distributions. Download only from this repository's workflow. Use the checksum and extraction commands above, inspect the archive entries before extraction, and compare `revision` with the reviewed full SHA. Checksums establish integrity, not publisher identity by themselves.
 
@@ -115,10 +115,6 @@ See [service, port and baseline monitoring](services-ports.md) for configuration
 ## x-ui/3x-ui
 
 См. [read-only мониторинг x-ui](xui.md): отдельный helper, root-owned политика и диагностика. / See [read-only x-ui monitoring](xui.md) for the separate helper, root-owned policy, and diagnostics.
-
-## Optional Telegram routes / Необязательные маршруты Telegram
-
-По умолчанию daemon подключается к Telegram напрямую. Для другой сети настройте [цепочку исходящих маршрутов](telegram-egress.md). / The daemon connects to Telegram directly by default. If your network requires another route, configure the [Telegram egress chain](telegram-egress.md).
 
 ## Optional GeoIP / Необязательный GeoIP
 

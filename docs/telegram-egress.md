@@ -22,11 +22,11 @@
 }
 ```
 
-- `vless` использует SOCKS5, который уже запущен локальным VLESS-клиентом. В отдельном файле укажите одну строку вида `socks5h://127.0.0.1:1080`. Если прокси требует авторизацию, URL может содержать имя и пароль с percent-encoding. Допустим числовой loopback-адрес, включая `[::1]`, с явным портом. DNS-запрос для Telegram выполняет прокси.
+- `vless` использует SOCKS5, который уже запущен локальным VLESS-клиентом. В отдельном файле укажите одну строку вида `socks5h://127.0.0.1:1080`. Если прокси требует авторизацию, укажите в URL непустые имя и пароль с percent-encoding. Длина обоих полей после percent-декодирования ограничена 233 байтами суммарно. Допустим числовой loopback-адрес, включая `[::1]`, с явным портом. DNS-запрос для Telegram выполняет прокси.
 - `wireguard` и `tailscale` используют готовый Linux-интерфейс (например, `wg0` или `tailscale0`). Укажите имя интерфейса и числовой адрес DNS-сервера с портом, доступный через этот интерфейс. Для IPv6 заключите адрес в квадратные скобки. DNS и соединение с Telegram привязаны к заданному интерфейсу. Host DNS для этих маршрутов не используется.
 - `{"type":"direct"}` использует сетевую маршрутизацию и DNS хоста. В настроенной цепочке прямое подключение доступно только при наличии этого элемента. Daemon не использует прокси из переменных окружения.
 
-Владелец файла SOCKS5 URL должен быть `root` или пользователь сервиса. Например, используйте `root:want-garde` с правами `0640` в каталоге `root:want-garde` с правами `0750`. Файл должен отличаться от конфигурации и файлов токенов. Укажите только путь к файлу в `config.json`. Команда `--check-config` от имени пользователя сервиса проверяет чтение и формат файла без подключения к прокси.
+Владелец файла SOCKS5 URL должен быть `root` или пользователь сервиса. Например, используйте `root:want-garde` с правами `0640` в каталоге `root:want-garde` с правами `0750`. Файл должен отличаться от конфигурации и файлов токенов. Укажите только путь к файлу в `config.json`. Команда `--check-config` от имени пользователя сервиса проверяет чтение и формат файла без подключения к прокси. Если любой из файлов не читается или содержит неверный URL, сервис отклоняет конфигурацию при запуске.
 
 Интерфейс, DNS, маршруты и локальный VLESS-клиент настраивает администратор VPS. Daemon запускается от пользователя `want-garde` без root и дополнительных capabilities. Проверьте, что ядро разрешает непривилегированному процессу привязку сокета к интерфейсу. Для Tailscale нужен Linux-интерфейс и маршрут до адресов Telegram через подготовленный узел выхода.
 
@@ -40,11 +40,11 @@
 
 If `telegram_egress` is absent, the daemon connects directly to `api.telegram.org`. Add one to four routes in order of preference under `telegram_egress.routes` in `config.json`. The example above tries a local SOCKS proxy first, then WireGuard.
 
-- `vless` uses a SOCKS5 listener provided by a local VLESS client. Put one line such as `socks5h://127.0.0.1:1080` in a separate file. The URL can include a percent-encoded username and password if required. Use a numeric loopback address, including `[::1]`, and an explicit port. The proxy resolves the Telegram hostname.
+- `vless` uses a SOCKS5 listener provided by a local VLESS client. Put one line such as `socks5h://127.0.0.1:1080` in a separate file. If the proxy requires authentication, put a nonempty username and password in the URL. The fields may be percent-encoded and total at most 233 bytes after decoding. Use a numeric loopback address, including `[::1]`, and an explicit port. The proxy resolves the Telegram hostname.
 - `wireguard` and `tailscale` use a prepared Linux interface such as `wg0` or `tailscale0`. Specify the interface name and a numeric DNS server address and port reachable through it. Enclose IPv6 addresses in brackets. DNS and Telegram connections bind to that interface. These routes bypass the host resolver.
 - `{"type":"direct"}` uses host routing and DNS. Include this entry in a configured chain only if direct access is intended. The daemon ignores proxy environment variables.
 
-The SOCKS5 URL file must be owned by `root` or the service user. For example, use `root:want-garde` with mode `0640` in a `root:want-garde` directory with mode `0750`. Keep it separate from the configuration and token files. Put only its path in `config.json`. Run `--check-config` as the service user to verify access and format without connecting to the proxy.
+The SOCKS5 URL file must be owned by `root` or the service user. For example, use `root:want-garde` with mode `0640` in a `root:want-garde` directory with mode `0750`. Keep it separate from the configuration and token files. Put only its path in `config.json`. Run `--check-config` as the service user to verify access and format without connecting to the proxy. Startup rejects the configuration if any credential file is unreadable or contains an invalid URL.
 
 The VPS administrator configures interfaces, DNS, routes, and the local VLESS client. The daemon runs as `want-garde` without root or extra capabilities. Verify that the Linux kernel permits unprivileged processes to bind sockets to the interface. Tailscale requires a Linux interface and a route to Telegram through the prepared exit node.
 

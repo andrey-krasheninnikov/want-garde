@@ -1,5 +1,6 @@
 use super::TransportError;
 use garde_config::{TelegramRoute, read_private};
+use percent_encoding::percent_decode_str;
 use reqwest::{Client, ClientBuilder, Proxy, Url, redirect::Policy, retry};
 use std::{error::Error, time::Duration};
 
@@ -52,13 +53,14 @@ impl Route {
 
     pub(super) fn connect_failure(&self, error: &reqwest::Error) -> &'static str {
         #[cfg(target_os = "linux")]
-        if sources(error).any(|source| {
-            matches!(
-                source.downcast_ref::<dns::Failure>(),
-                Some(dns::Failure::Interface)
-            )
-        }) {
-            return "telegram.tunnel_interface";
+        if let Some(failure) =
+            sources(error).find_map(|source| source.downcast_ref::<dns::Failure>())
+        {
+            return match failure {
+                dns::Failure::Interface => "telegram.tunnel_interface",
+                dns::Failure::Routing => "telegram.tunnel_connect",
+                dns::Failure::Lookup => "telegram.dns",
+            };
         }
         if error.is_dns() {
             return "telegram.dns";
@@ -125,6 +127,19 @@ fn private_proxy(path: &std::path::Path) -> Result<Proxy, TransportError> {
         || url.fragment().is_some()
     {
         return Err(error());
+    }
+    // Leave 29 bytes for negotiation, authentication headers, and CONNECT to api.telegram.org
+    // in hyper-util 0.1.21's 262-byte SOCKS5 send buffer.
+    const MAX_SOCKS5_AUTH_BYTES: usize = 233;
+    match (url.username(), url.password()) {
+        ("", None) if !text.contains('@') => {}
+        (user, Some(password))
+            if !user.is_empty()
+                && !password.is_empty()
+                && percent_decode_str(user).decode_utf8_lossy().len()
+                    + percent_decode_str(password).decode_utf8_lossy().len()
+                    <= MAX_SOCKS5_AUTH_BYTES => {}
+        _ => return Err(error()),
     }
     Proxy::all(url).map_err(|_| error())
 }
