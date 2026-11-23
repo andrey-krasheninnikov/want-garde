@@ -58,10 +58,6 @@ impl Database {
                         return;
                     }
                 };
-                if let Err(code) = crate::notification_policy::initialize(&store.connection) {
-                    let _ = ready.send(Err(code));
-                    return;
-                }
                 store.geoip_config = Some(config.clone());
                 if let Err(code) = store.recover_geoip(now()) {
                     let _ = ready.send(Err(code));

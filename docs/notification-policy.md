@@ -13,14 +13,15 @@
 
 Интервалы **quiet_hours** имеют формат HH:MM-HH:MM, включают начало и исключают конец.
 Окно может пересекать полночь. **critical_bypasses_quiet** явно разрешает обход для critical.
-Dedup работает отдельно по получателю и сохраняется после перезапуска. Повторы не подавляют
+Обход по умолчанию выключен. Очередь перепроверяет тишину перед отправкой.
+Дедупликация работает отдельно по получателю и сохраняется после перезапуска. Повторы не подавляют
 вклад событий в оперативную сводку. Подавление immediate не удаляет исходное событие.
 
 **daily** включает ежедневную сводку. **at** по умолчанию 14:00 в указанном часовом поясе.
 **hours** задаёт окно подсчёта (24 часа по умолчанию). В пропущенный при переводе часов
 момент используется первое доступное время того же дня. При повторённом времени выбирается
 первое наступление. Сводка создаётся один раз для даты и получателя. Очередь принимает
-пропущенные сводки по мере наличия данных в пределах retention.
+пропущенные сводки с событиями в пределах срока хранения.
 
 **live** включает оперативную сводку для событий с **aggregate**. По умолчанию окно 300 секунд
 и порог три события. Готовые сводки ждут окончания тишины. Маршруты **summary.daily** и
@@ -40,6 +41,7 @@ The **notifications** section controls recipients. A policy entry does not subsc
 
 **quiet_hours** takes HH:MM-HH:MM windows with inclusive starts and exclusive ends.
 Windows can cross midnight. **critical_bypasses_quiet** enables the critical bypass explicitly.
+The bypass defaults to off. The queue checks quiet hours again before sending.
 Deduplication applies per recipient and survives restart. Duplicate alerts still count toward
 live summaries. Suppressing an immediate notification preserves the original event.
 
@@ -47,7 +49,7 @@ live summaries. Suppressing an immediate notification preserves the original eve
 **hours** sets the lookback, defaulting to 24. If a clock change skips the configured minute,
 the summary is due at the first valid minute on that date. The earlier occurrence is used
 when the minute repeats. A summary is queued once per date and recipient. Missed summaries
-catch up while their data remains within retention.
+catch up for dates with events within retention.
 
 **live** enables live summaries for rules with **aggregate**. The defaults are a 300-second
 window and a minimum of three events. Summaries wait until quiet hours end. Use **summary.daily**

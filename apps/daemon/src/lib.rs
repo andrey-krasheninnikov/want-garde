@@ -202,7 +202,11 @@ impl Bot {
                     &self.config,
                     &self.locale,
                     runtime::now(),
-                )?,
+                )
+                .unwrap_or_else(|code| {
+                    eprintln!("{code}");
+                    message(&self.locale, "operation_failed").into()
+                }),
             })
         } else if let Some(query) = history {
             let text = match query

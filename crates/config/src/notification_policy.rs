@@ -52,7 +52,7 @@ impl Default for Preferences {
             min_severity: Severity::Info,
             time_zone: chrono_tz::UTC,
             quiet_hours: Vec::new(),
-            critical_bypasses_quiet: true,
+            critical_bypasses_quiet: false,
             daily: None,
             live: None,
         }

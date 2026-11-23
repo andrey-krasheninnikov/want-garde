@@ -232,6 +232,7 @@ impl Store {
         sql(connection.execute("UPDATE deliveries SET state='pending',uncertain=1,last_error='delivery.uncertain' WHERE state='in_flight'",[]))?;
         crate::geoip::initialize(&connection)?;
         crate::retention::initialize(&connection)?;
+        crate::notification_policy::initialize(&connection)?;
         if let Err(code) = crate::retention::recover_result_writes(&directory) {
             eprintln!("{code}");
         }
@@ -439,8 +440,10 @@ impl Store {
             "INSERT INTO events VALUES(?1,?2,?3)",
             params![event.id.as_str(), payload, now],
         ))?;
+        let mut slots = Self::notification_slots(self.geoip_config.as_ref(), &transaction)?;
         enqueue_event(
             &transaction,
+            &mut slots,
             event,
             replies,
             self.geoip_config.as_ref(),
@@ -617,6 +620,7 @@ impl Store {
         }
         self.admit(self.event_reply_admission(count), now)?;
         let transaction = sql(self.connection.transaction())?;
+        let mut slots = Self::notification_slots(self.geoip_config.as_ref(), &transaction)?;
         for ((event, replies), payload) in publications.iter().zip(events) {
             let Some(payload) = payload else { continue };
             sql(transaction.execute(
@@ -625,6 +629,7 @@ impl Store {
             ))?;
             enqueue_event(
                 &transaction,
+                &mut slots,
                 event,
                 replies,
                 self.geoip_config.as_ref(),
@@ -665,13 +670,19 @@ impl Store {
         self.maintenance(now)?;
         let transaction = sql(self.connection.transaction())?;
         sql(transaction.execute("UPDATE deliveries SET state='dead_letter',last_error=CASE WHEN expires_at<=?1 THEN 'delivery.expired' ELSE 'delivery.exhausted' END,updated_at=?1 WHERE id IN (SELECT id FROM deliveries WHERE state='pending' AND (expires_at<=?1 OR attempts>=128) LIMIT 100)",[now]))?;
+        let (quiet, critical_only) =
+            crate::notification_policy::quiet_chats(self.geoip_config.as_ref(), now)?;
         let mut value = sql(transaction.query_row(
             "SELECT id,chat_id,text,attempts,topic_id,silent,protect_content,redacted
              FROM deliveries d WHERE state='pending' AND next_at<=?1 AND expires_at>?1 AND attempts<128
              AND NOT EXISTS(SELECT 1 FROM deliveries a WHERE a.chat_id=d.chat_id AND a.state='in_flight')
              AND NOT EXISTS(SELECT 1 FROM cooldowns c WHERE c.chat_id=d.chat_id AND c.until_at>?1)
+             AND (d.event_id IS NULL OR (
+                 d.chat_id NOT IN (SELECT value FROM json_each(?2))
+                 AND (d.chat_id NOT IN (SELECT value FROM json_each(?3))
+                      OR EXISTS(SELECT 1 FROM notification_critical WHERE delivery_id=d.id))))
              ORDER BY next_at,id LIMIT 1",
-            [now],
+            params![now, quiet, critical_only],
             |r| Ok(Delivery {
                 id: r.get(0)?,
                 attempts: r.get::<_,u32>(3)? + 1,
@@ -749,6 +760,23 @@ impl Store {
         Ok((pages - free) * 4096)
     }
 
+    fn notification_slots(
+        config: Option<&garde_config::Config>,
+        tx: &rusqlite::Transaction<'_>,
+    ) -> Result<Option<u32>> {
+        let Some(config) = config.filter(|c| c.notification_policy.is_some()) else {
+            return Ok(None);
+        };
+        let pending: u32 = sql(tx.query_row(
+            "SELECT count(*) FROM deliveries WHERE state IN ('pending','in_flight')",
+            [],
+            |r| r.get(0),
+        ))?;
+        Ok(Some(
+            config.retention.pending_deliveries.saturating_sub(pending),
+        ))
+    }
+
     fn event_reply_admission(&self, count: usize) -> i64 {
         if self
             .geoip_config
@@ -814,6 +842,7 @@ impl Store {
             params![cutoff, pressure],
         ))?;
         let events=sql(transaction.execute("DELETE FROM events WHERE id IN (SELECT id FROM events e WHERE NOT EXISTS(SELECT 1 FROM deliveries d WHERE d.event_id=e.id) AND (created_at<?1 OR ?2 OR (SELECT count(*) FROM events)>20000) ORDER BY created_at,id LIMIT 16)",params![cutoff,pressure]))?;
+        crate::notification_policy::prune(&transaction, cutoff, now)?;
         let audit = crate::retention::prune_audit(&transaction, self.retention, now, pressure)?;
         if removed + events + audit > 0 {
             sql(transaction.execute("UPDATE meta SET value=min(4294967295,CAST(value AS INTEGER)+?1) WHERE key='pruned'",[(removed+events+audit) as i64]))?;
@@ -1052,6 +1081,7 @@ fn add_delivery_envelope(transaction: &rusqlite::Transaction<'_>) -> Result<()> 
 
 fn enqueue_event(
     transaction: &rusqlite::Transaction<'_>,
+    slots: &mut Option<u32>,
     event: &Event,
     replies: &[Reply],
     config: Option<&garde_config::Config>,
@@ -1060,20 +1090,16 @@ fn enqueue_event(
     let context = crate::geoip::record(transaction, event, config, now)?;
     let owner = config.and_then(|config| config.owner_user_id.as_deref());
     for reply in replies {
-        if let Some(config) = config
-            && let Some(policy) = &config.notification_policy
-        {
-            if !crate::notification_policy::select(transaction, policy, event, reply, now)? {
+        let mut critical = false;
+        if let Some(policy) = config.and_then(|c| c.notification_policy.as_ref()) {
+            let Some(severity) =
+                crate::notification_policy::select(transaction, policy, event, reply, now)?
+            else {
                 continue;
-            }
-            let pending: u32 = sql(transaction.query_row(
-                "SELECT count(*) FROM deliveries WHERE state IN ('pending','in_flight')",
-                [],
-                |r| r.get(0),
-            ))?;
-            if pending >= config.retention.pending_deliveries {
-                return Err("storage.quota");
-            }
+            };
+            let remaining = slots.as_mut().ok_or("storage.quota")?;
+            *remaining = remaining.checked_sub(1).ok_or("storage.quota")?;
+            critical = severity == garde_contracts::Severity::Critical;
         }
         let body = &reply.text;
         let locale = reply
@@ -1107,8 +1133,11 @@ fn enqueue_event(
             now,
             86400,
         )?;
+        let id = transaction.last_insert_rowid();
+        if critical {
+            sql(transaction.execute("INSERT INTO notification_critical VALUES(?1)", [id]))?;
+        }
         if context.is_some_and(|c| c.reason_key.as_str() == "geoip_pending") {
-            let id = transaction.last_insert_rowid();
             sql(transaction.execute(
                 "INSERT INTO geoip_deliveries VALUES(?1,?2,?3)",
                 params![id, locale, body],

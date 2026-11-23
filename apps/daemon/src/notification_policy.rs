@@ -23,6 +23,8 @@ pub(crate) fn initialize(connection: &Connection) -> Result<()> {
             closed INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY(chat_id,start_at,end_at));
          CREATE INDEX IF NOT EXISTS notification_buckets_due ON notification_buckets(end_at);
+         CREATE TABLE IF NOT EXISTS notification_critical(
+            delivery_id INTEGER PRIMARY KEY REFERENCES deliveries(id) ON DELETE CASCADE);
          CREATE TABLE IF NOT EXISTS notification_daily(
             chat_id TEXT PRIMARY KEY, last_date TEXT NOT NULL);",
     ))
@@ -42,6 +44,7 @@ fn signature(event: &Event, severity: Severity) -> Result<[u8; 32]> {
     let mut evidence: Vec<_> = event
         .evidence
         .iter()
+        .filter(|item| event.source.as_str() != "ssh" || item.name.as_str() != "port")
         .map(|item| (item.name.as_str(), item.value.as_str()))
         .collect();
     evidence.sort_unstable();
@@ -55,40 +58,110 @@ fn signature(event: &Event, severity: Severity) -> Result<[u8; 32]> {
     Ok(Sha256::digest(key).into())
 }
 
+pub(crate) fn prune(connection: &Connection, cutoff: i64, now: i64) -> Result<()> {
+    sql(connection.execute(
+        "DELETE FROM notification_seen WHERE rowid IN
+          (SELECT rowid FROM notification_seen WHERE expires_at<=?1 ORDER BY expires_at LIMIT 128)",
+        [now],
+    ))?;
+    sql(connection.execute(
+        "DELETE FROM notification_buckets WHERE rowid IN
+          (SELECT rowid FROM notification_buckets WHERE end_at<?1 ORDER BY end_at LIMIT 32)",
+        [cutoff],
+    ))?;
+    Ok(())
+}
+
+pub(crate) fn quiet_chats(
+    config: Option<&garde_config::Config>,
+    now: i64,
+) -> Result<(String, String)> {
+    let mut blocked = Vec::new();
+    let mut critical_only = Vec::new();
+    if let Some(config) = config
+        && let Some(policy) = &config.notification_policy
+    {
+        let now = DateTime::<Utc>::from_timestamp(now, 0).ok_or("service.clock")?;
+        for chat in config
+            .owner_user_id
+            .iter()
+            .chain(
+                config
+                    .notifications
+                    .private
+                    .iter()
+                    .map(|recipient| &recipient.chat_id),
+            )
+            .chain(
+                config
+                    .notifications
+                    .forums
+                    .iter()
+                    .map(|forum| &forum.chat_id),
+            )
+            .chain(policy.recipients.keys())
+        {
+            let preference = policy.preferences(chat);
+            if preference.quiet(now) {
+                if preference.critical_bypasses_quiet {
+                    critical_only.push(chat);
+                } else {
+                    blocked.push(chat);
+                }
+            }
+        }
+    }
+    Ok((
+        serde_json::to_string(&blocked).map_err(|_| "notification.invalid")?,
+        serde_json::to_string(&critical_only).map_err(|_| "notification.invalid")?,
+    ))
+}
+
 pub(crate) fn select(
     transaction: &Connection,
     policy: &NotificationPolicy,
     event: &Event,
     reply: &Reply,
     now: i64,
-) -> Result<bool> {
+) -> Result<Option<Severity>> {
     let preferences = policy.preferences(&reply.chat_id);
     let rule = policy.rule(event.classification.rule_id.as_str());
     let severity = rule.severity.unwrap_or(event.classification.severity);
     if !rule.enabled || rank(severity) < rank(rule.min_severity).max(rank(preferences.min_severity))
     {
-        return Ok(false);
+        return Ok(None);
     }
     if rule.aggregate
         && let Some(live) = &preferences.live
     {
         let window = i64::from(live.window_seconds);
         let start = now.div_euclid(window) * window;
-        sql(transaction.execute(
-            "INSERT INTO notification_buckets(chat_id,start_at,end_at,total,minimum) VALUES (?1,?2,?3,1,?4)
-             ON CONFLICT(chat_id,start_at,end_at) DO UPDATE SET total=min(4294967295,total+1) WHERE closed=0",
-            params![reply.chat_id,start,start.saturating_add(window),live.minimum_events],
-        ))?;
+        let increment = |start: i64| {
+            sql(transaction.execute(
+                "INSERT INTO notification_buckets(chat_id,start_at,end_at,total,minimum) VALUES (?1,?2,?3,1,?4)
+                 ON CONFLICT(chat_id,start_at,end_at) DO UPDATE SET total=min(4294967295,total+1) WHERE closed=0",
+                params![reply.chat_id,start,start.saturating_add(window),live.minimum_events],
+            ))
+        };
+        if increment(start)? == 0 {
+            // New events after a clock rollback belong to the next unclosed window.
+            let end: i64 = sql(transaction.query_row(
+                "SELECT max(end_at) FROM notification_buckets WHERE chat_id=?1 AND closed=1",
+                [&reply.chat_id],
+                |row| row.get(0),
+            ))?;
+            increment(end.div_euclid(window) * window)?;
+        }
     }
     let wall_time = DateTime::<Utc>::from_timestamp(now, 0).ok_or("service.clock")?;
     if !rule.immediate
         || (preferences.quiet(wall_time)
             && !(severity == Severity::Critical && preferences.critical_bypasses_quiet))
     {
-        return Ok(false);
+        return Ok(None);
     }
     if rule.dedupe_seconds == 0 {
-        return Ok(true);
+        return Ok(Some(severity));
     }
     let digest = signature(event, severity)?;
     let seen: Option<i64> = sql(transaction
@@ -100,14 +173,14 @@ pub(crate) fn select(
         .optional())?;
     let seconds = i64::from(rule.dedupe_seconds);
     if seen.is_some_and(|seen| now.saturating_sub(seen) < seconds) {
-        return Ok(false);
+        return Ok(None);
     }
     sql(transaction.execute(
         "INSERT INTO notification_seen VALUES (?1,?2,?3,?4)
          ON CONFLICT(chat_id,signature) DO UPDATE SET seen_at=excluded.seen_at,expires_at=excluded.expires_at",
         params![reply.chat_id,digest.as_slice(),now,now.saturating_add(seconds)],
     ))?;
-    Ok(true)
+    Ok(Some(severity))
 }
 
 use crate::delivery::Store;
@@ -138,11 +211,12 @@ fn persist_summary(
     config: &garde_config::Config,
     reply: &Reply,
     kind: &str,
-    at: i64,
+    period: (i64, i64),
     now: i64,
 ) -> Result<()> {
-    let mut event = summary_event(at, kind, config.server_id.clone())?;
-    let digest = Sha256::digest(format!("{}:{kind}:{at}", reply.chat_id).as_bytes());
+    let (start, end) = period;
+    let mut event = summary_event(end, kind, config.server_id.clone())?;
+    let digest = Sha256::digest(format!("{}:{kind}:{start}:{end}", reply.chat_id).as_bytes());
     event.id = Id::new(format!("summary-{digest:x}"))?;
     let payload = serde_json::to_string(&event).map_err(|_| "notification.invalid")?;
     sql(transaction.execute(
@@ -189,7 +263,7 @@ fn count_for_daily(
     let min = rank(policy.preferences(chat).min_severity);
     let mut statement = sql(connection.prepare(
         "SELECT json_extract(payload,'$.classification.rule_id'),json_extract(payload,'$.classification.severity'),count(*)
-         FROM events WHERE created_at>?1 AND created_at<=?2 AND json_extract(payload,'$.source')<>'summary' GROUP BY 1,2",
+         FROM events WHERE created_at>=?1 AND created_at<?2 AND json_extract(payload,'$.source')<>'summary' GROUP BY 1,2",
     ))?;
     let rows = sql(statement.query_map(params![start, end], |r| {
         Ok((
@@ -238,26 +312,20 @@ impl Store {
         let bot = crate::Bot::new(config.clone())?;
         let daily = summary_event(now, "daily", config.server_id.clone())?;
         let live = summary_event(now, "live", config.server_id.clone())?;
+        let mut failure = None;
         for reply in bot.event_replies(&daily)? {
             let pref = policy.preferences(&reply.chat_id);
-            self.tick_daily(&config, policy, pref, reply, now_utc)?;
+            if let Err(code) = self.tick_daily(&config, policy, pref, reply, now_utc) {
+                failure.get_or_insert(code);
+            }
         }
         for reply in bot.event_replies(&live)? {
             let pref = policy.preferences(&reply.chat_id);
-            self.tick_live(&config, pref, reply, now_utc)?;
+            if let Err(code) = self.tick_live(&config, pref, reply, now_utc) {
+                failure.get_or_insert(code);
+            }
         }
-        let retain_after = now.saturating_sub(i64::from(self.retention.event_days) * 86400);
-        sql(self.connection.execute(
-            "DELETE FROM notification_seen WHERE rowid IN
-              (SELECT rowid FROM notification_seen WHERE expires_at<=?1 ORDER BY expires_at LIMIT 32)",
-            [now],
-        ))?;
-        sql(self.connection.execute(
-            "DELETE FROM notification_buckets WHERE rowid IN
-              (SELECT rowid FROM notification_buckets WHERE closed=1 AND end_at<?1 ORDER BY end_at LIMIT 32)",
-            [retain_after],
-        ))?;
-        Ok(())
+        failure.map_or(Ok(()), Err)
     }
 
     fn tick_daily(
@@ -321,8 +389,10 @@ impl Store {
             at.saturating_sub(i64::from(daily.hours) * 3600),
             at,
         )?;
-        summary_text(&mut reply, "daily", total, at)?;
-        persist_summary(&tx, config, &reply, "daily", at, timestamp)?;
+        if total > 0 || date == today {
+            summary_text(&mut reply, "daily", total, at)?;
+            persist_summary(&tx, config, &reply, "daily", (at, at), timestamp)?;
+        }
         sql(tx.execute(
             "UPDATE notification_daily SET last_date=?2 WHERE chat_id=?1",
             params![reply.chat_id, date.to_string()],
@@ -341,12 +411,13 @@ impl Store {
             return Ok(());
         }
         let timestamp = now.timestamp();
+        let cutoff = timestamp.saturating_sub(i64::from(self.retention.event_days) * 86400);
         let bucket: Option<(i64, i64, u32, u32)> = sql(self
             .connection
             .query_row(
                 "SELECT start_at,end_at,total,minimum FROM notification_buckets
-             WHERE chat_id=?1 AND end_at<=?2 AND closed=0 ORDER BY end_at,start_at LIMIT 1",
-                params![reply.chat_id, timestamp],
+             WHERE chat_id=?1 AND end_at BETWEEN ?2 AND ?3 AND closed=0 ORDER BY end_at,start_at LIMIT 1",
+                params![reply.chat_id, cutoff, timestamp],
                 |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
             )
             .optional())?;
@@ -359,7 +430,7 @@ impl Store {
         let tx = sql(self.connection.transaction())?;
         if total >= minimum {
             summary_text(&mut reply, "live", total, end)?;
-            persist_summary(&tx, config, &reply, "live", end, timestamp)?;
+            persist_summary(&tx, config, &reply, "live", (start, end), timestamp)?;
         }
         sql(tx.execute("UPDATE notification_buckets SET closed=1 WHERE chat_id=?1 AND start_at=?2 AND end_at=?3",
             params![reply.chat_id,start,end]))?;
@@ -422,7 +493,11 @@ pub(crate) fn render_status(
                 text,
                 "\n{}: {}",
                 message(locale, "notification_quiet"),
-                crate::isolate(&pref.quiet_hours.join(", "))
+                pref.quiet_hours
+                    .iter()
+                    .map(|window| crate::isolate(window))
+                    .collect::<Vec<_>>()
+                    .join(", ")
             );
         }
         if pref.daily.is_some() {

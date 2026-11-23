@@ -312,3 +312,94 @@ async fn owner_can_queue_one_health_reply_under_outbox_pressure() {
         .unwrap();
     assert!(reply.text.contains("Intake limited by storage"));
 }
+
+#[tokio::test]
+async fn notifications_schedule_is_localized_and_private_to_owner() {
+    use garde_daemon::runtime::{Database, now};
+    let temporary = tempfile::tempdir().unwrap();
+    let dir = temporary.path();
+    fs::set_permissions(dir, fs::Permissions::from_mode(0o700)).unwrap();
+    let windows: Vec<_> = (0..16)
+        .map(|minute| format!("00:{minute:02}-01:{minute:02}"))
+        .collect();
+    let config: Config = serde_json::from_value(json!({
+        "server_id":"server-demo","bot_token_file":dir.join("absent"),"state_dir":dir,
+        "owner_user_id":"123456789","default_locale":"en",
+        "notification_policy":{"default_preferences":{
+            "time_zone":"Etc/UTC","daily":{"at":"14:00"},"quiet_hours":windows
+        }}
+    }))
+    .unwrap();
+    let db = Database::open(config.clone()).await.unwrap();
+    let mut bot = Bot::new(config).unwrap();
+    let update = |id: i64, actor: i64, chat: i64, kind: &str, text: &str| json!({"update_id":id,"message":{"from":{"id":actor,"is_bot":false},"chat":{"id":chat,"type":kind},"text":text}});
+    for (id, actor, chat, kind) in [
+        (1, 123456788, 123456788, "private"),
+        (2, 123456789, -123456789, "supergroup"),
+    ] {
+        bot.process_update(
+            &db,
+            &update(id, actor, chat, kind, "/notifications"),
+            &Host,
+            "test_bot",
+        )
+        .await
+        .unwrap();
+    }
+    assert!(db.call(|s| s.claim(now())).await.unwrap().is_none());
+    for (index, (locale, copy)) in garde_entrypoint::catalog()["locales"]
+        .as_object()
+        .unwrap()
+        .iter()
+        .enumerate()
+    {
+        let first = index as i64 * 2 + 3;
+        bot.process_update(
+            &db,
+            &update(
+                first,
+                123456789,
+                123456789,
+                "private",
+                &format!("/language {locale}"),
+            ),
+            &Host,
+            "test_bot",
+        )
+        .await
+        .unwrap();
+        bot.process_update(
+            &db,
+            &update(first + 1, 123456789, 123456789, "private", "/notifications"),
+            &Host,
+            "test_bot",
+        )
+        .await
+        .unwrap();
+        let text = db
+            .call(|s| {
+                let language = s.claim(now())?.expect("language reply");
+                s.finish(
+                    language.id,
+                    garde_daemon::delivery::Outcome::Delivered,
+                    now(),
+                )?;
+                let schedule = s.claim(now())?.expect("schedule reply");
+                s.finish(
+                    schedule.id,
+                    garde_daemon::delivery::Outcome::Delivered,
+                    now(),
+                )?;
+                Ok(schedule.reply.text)
+            })
+            .await
+            .unwrap();
+        assert!(text.contains(copy["notification_title"].as_str().unwrap()));
+        assert!(text.contains(copy["notification_daily"].as_str().unwrap()));
+        assert!(text.contains("T14:00:00"));
+        assert!(text.contains("00:15-01:15"));
+        if ["ar", "he"].contains(&locale.as_str()) {
+            assert!(text.contains("\u{2068}00:15-01:15\u{2069}"));
+        }
+    }
+}
