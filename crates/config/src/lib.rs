@@ -1,7 +1,7 @@
 mod geoip;
 mod retention;
 pub use geoip::GeoIpConfig;
-pub use retention::Retention;
+pub use retention::{MAX_OBSERVATION_BATCH, Retention};
 mod host;
 mod monitoring;
 mod xui;

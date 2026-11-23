@@ -500,3 +500,32 @@ fn an_event_reaches_independent_recipients_and_pending_delivery_survives_restart
     store.finish(retried.id, Outcome::Delivered, 1005).unwrap();
     assert_eq!(store.health(1005).unwrap().delivered, 2);
 }
+
+#[test]
+fn a_dead_letter_remains_visible_when_the_event_ages_past_retention() {
+    let dir = private_dir();
+    let event = event();
+    let policy = garde_config::Retention {
+        event_days: 1,
+        ..Default::default()
+    };
+    let mut store =
+        Store::open_with_retention(dir.path(), event.server_id.as_str(), "123456789", policy)
+            .unwrap();
+    store
+        .publish(
+            &event,
+            &[Reply {
+                locale: None,
+                chat_id: "123456789".into(),
+                text: "expiring".into(),
+            }],
+            1000,
+        )
+        .unwrap();
+    assert!(store.claim(87400).unwrap().is_none());
+    assert!(store.claim(87401).unwrap().is_none());
+    let health = store.health(87401).unwrap();
+    assert_eq!(health.dead_letter, 1);
+    assert_eq!(health.problems[0].reason_key.as_str(), "delivery.expired");
+}

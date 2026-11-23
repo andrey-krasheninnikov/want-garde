@@ -167,6 +167,10 @@ async fn identity_in_message_text_and_an_untrusted_chat_never_grant_access() {
 
 #[tokio::test]
 async fn history_uses_saved_locale_and_rejects_unsafe_chat_context() {
+    use garde_daemon::{
+        delivery::Outcome,
+        runtime::{Database, now},
+    };
     let directory = tempfile::tempdir().unwrap();
     fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700)).unwrap();
     let config: Config = serde_json::from_value(json!({
@@ -174,21 +178,28 @@ async fn history_uses_saved_locale_and_rejects_unsafe_chat_context() {
         "state_dir":directory.path(), "owner_user_id":"123456789", "default_locale":"he"
     }))
     .unwrap();
-    let database = garde_daemon::runtime::Database::open(config.clone())
-        .await
-        .unwrap();
+    let database = Database::open(config.clone()).await.unwrap();
     let mut bot = Bot::new(config).unwrap();
-    let event: garde_contracts::Event =
+    let mut event: garde_contracts::Event =
         serde_json::from_str(include_str!("../../../fixtures/contracts/event.json")).unwrap();
-    let event_id = event.id.as_str().to_owned();
+    let event_id = "z".repeat(128);
+    let first_id = event_id.clone();
+    let source = event.source.as_str().to_owned();
+    let at = event.observed_at.to_rfc3339();
     database
-        .call(move |s| s.publish(&event, &[], garde_daemon::runtime::now()))
+        .call(move |s| {
+            let persisted_at = now();
+            event.id = Id::new("older")?;
+            s.publish(&event, &[], persisted_at)?;
+            event.id = Id::new(first_id)?;
+            s.publish(&event, &[], persisted_at)
+        })
         .await
         .unwrap();
-    let update = |epoch, user, kind| {
+    let update = |epoch, user, kind, text: &str| {
         json!({
             "update_id":epoch, "message":{"from":{"id":user,"is_bot":false},
-            "chat":{"id":user,"type":kind},"text":"/recent"}
+            "chat":{"id":user,"type":kind},"text":text}
         })
     };
     for (epoch, user, kind) in [
@@ -196,24 +207,101 @@ async fn history_uses_saved_locale_and_rejects_unsafe_chat_context() {
         (2, 123456789, "group"),
         (3, 123456789, "private"),
     ] {
-        bot.process_update(&database, &update(epoch, user, kind), &Host, "test_bot")
-            .await
-            .unwrap();
+        bot.process_update(
+            &database,
+            &update(epoch, user, kind, "/recent 1"),
+            &Host,
+            "test_bot",
+        )
+        .await
+        .unwrap();
     }
     let (reply, pending) = database
         .call(|s| {
-            let now = garde_daemon::runtime::now();
-            Ok((
-                s.claim(now)?.map(|delivery| delivery.reply),
-                s.health(now)?.pending,
-            ))
+            let delivery = s.claim(now())?.unwrap();
+            s.finish(delivery.id, Outcome::Delivered, now())?;
+            Ok((delivery.reply, s.health(now())?.pending))
         })
         .await
         .unwrap();
-    let reply = reply.unwrap();
     assert_eq!(reply.chat_id, "123456789");
     assert!(reply.text.starts_with("היסטוריית אירועים"));
     assert!(reply.text.contains(&event_id));
+    assert!(reply.text.contains(&source));
+    assert!(reply.text.contains(&at));
     assert!(reply.text.contains('\u{2068}'));
     assert_eq!(pending, 0);
+    let next = reply
+        .text
+        .lines()
+        .find(|line| line.starts_with("/recent 1 "))
+        .unwrap();
+    assert!(next.ends_with(&event_id));
+    bot.process_update(
+        &database,
+        &update(4, 123456789, "private", next),
+        &Host,
+        "test_bot",
+    )
+    .await
+    .unwrap();
+    let reply = database
+        .call(|s| Ok(s.claim(now())?.unwrap().reply))
+        .await
+        .unwrap();
+    assert!(reply.text.contains("older"));
+    assert!(!reply.text.contains(&event_id));
+}
+
+#[tokio::test]
+async fn owner_can_queue_one_health_reply_under_outbox_pressure() {
+    use garde_daemon::{
+        Reply,
+        runtime::{Database, now},
+    };
+    let directory = tempfile::tempdir().unwrap();
+    fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let config: Config = serde_json::from_value(json!({
+        "server_id":"server-demo", "bot_token_file":directory.path().join("absent"),
+        "state_dir":directory.path(), "owner_user_id":"123456789", "default_locale":"en",
+        "retention":{"pending_deliveries":2048}
+    }))
+    .unwrap();
+    let db = Database::open(config.clone()).await.unwrap();
+    let mut bot = Bot::new(config).unwrap();
+    db.call(|s| {
+        let mut event: garde_contracts::Event =
+            serde_json::from_str(include_str!("../../../fixtures/contracts/event.json")).unwrap();
+        let replies: Vec<_> = (0..32)
+            .map(|i| Reply {
+                locale: None,
+                chat_id: (123450000 + i).to_string(),
+                text: "queued event".into(),
+            })
+            .collect();
+        for i in 0..64 {
+            event.id = Id::new(format!("event-batch-{i}")).unwrap();
+            s.publish(&event, &replies, now().saturating_add(20))?;
+        }
+        Ok(())
+    })
+    .await
+    .unwrap();
+    let update = |id| {
+        json!({"update_id":id,"message":{"from":{"id":123456789,"is_bot":false},
+        "chat":{"id":123456789,"type":"private"},"text":"/health"}})
+    };
+    assert_eq!(
+        bot.process_update(&db, &update(1), &Host, "test_bot").await,
+        Ok(2)
+    );
+    assert_eq!(
+        bot.process_update(&db, &update(2), &Host, "test_bot").await,
+        Err("storage.quota")
+    );
+    let reply = db
+        .call(|s| Ok(s.claim(now())?.unwrap().reply))
+        .await
+        .unwrap();
+    assert!(reply.text.contains("Intake limited by storage"));
 }

@@ -127,6 +127,29 @@ fn files(state_dir: &Path) -> Result<Vec<(PathBuf, u64)>> {
     Ok(entries)
 }
 
+pub(crate) fn recover_result_writes(state_dir: &Path) -> Result<()> {
+    for (path, _) in files(state_dir)? {
+        let Some((pid, sequence)) = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .and_then(|s| s.strip_prefix(".garde-"))
+            .and_then(|s| s.split_once('-'))
+        else {
+            continue;
+        };
+        if pid
+            .parse::<u32>()
+            .is_ok_and(|n| n > 0 && pid == n.to_string())
+            && sequence
+                .parse::<u64>()
+                .is_ok_and(|n| sequence == n.to_string())
+        {
+            fs::remove_file(path).map_err(|_| "storage.results")?;
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn result_usage(state_dir: &Path) -> Result<(u64, u32)> {
     let entries = files(state_dir)?;
     let bytes = entries

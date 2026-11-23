@@ -174,6 +174,7 @@ impl Bot {
         let history = self
             .command(update, username)
             .and_then(|(command, args)| history::Query::parse(command.strip_prefix('/')?, &args));
+        let health_reply = matches!(history.as_ref(), Some(Ok(history::Query::Health)));
         let reply = if let Some(query) = history {
             let text = match query
                 .and_then(|query| history::inspect(&self.config, query, runtime::now()))
@@ -311,7 +312,9 @@ impl Bot {
             }
         };
         database
-            .call(move |store| store.consume_update(id, reply, runtime::now()))
+            .call(move |store| {
+                store.consume_update_with_reserve(id, reply, runtime::now(), health_reply)
+            })
             .await
     }
 

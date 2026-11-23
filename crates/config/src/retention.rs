@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+pub const MAX_OBSERVATION_BATCH: usize = 2048;
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Retention {
@@ -37,7 +39,7 @@ impl Retention {
         .all(|days| (1..=3650).contains(&days))
             && (1..=8760).contains(&self.result_hours)
             && (8..=256).contains(&self.database_mib)
-            && (1..=10_000).contains(&self.pending_deliveries)
+            && (MAX_OBSERVATION_BATCH as u32..=10_000).contains(&self.pending_deliveries)
             && (1..=128).contains(&self.result_mib)
     }
 

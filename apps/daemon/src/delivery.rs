@@ -225,6 +225,9 @@ impl Store {
         sql(connection.execute("UPDATE deliveries SET state='pending',uncertain=1,last_error='delivery.uncertain' WHERE state='in_flight'",[]))?;
         crate::geoip::initialize(&connection)?;
         crate::retention::initialize(&connection)?;
+        if let Err(code) = crate::retention::recover_result_writes(&directory) {
+            eprintln!("{code}");
+        }
         Ok(Self {
             geoip_config: None,
             connection,
@@ -299,6 +302,16 @@ impl Store {
     }
 
     pub fn consume_update(&mut self, id: i64, reply: Option<Reply>, now: i64) -> Result<i64> {
+        self.consume_update_with_reserve(id, reply, now, false)
+    }
+
+    pub(crate) fn consume_update_with_reserve(
+        &mut self,
+        id: i64,
+        reply: Option<Reply>,
+        now: i64,
+        health_reply: bool,
+    ) -> Result<i64> {
         if !(0..i64::MAX).contains(&id) {
             return Err("request.invalid");
         }
@@ -307,7 +320,7 @@ impl Store {
             return Ok(offset);
         }
         if reply.is_some() {
-            self.admit(1, now)?;
+            self.admit_with_reserve(1, now, health_reply)?;
         }
         let transaction = sql(self.connection.transaction())?;
         if let Some(reply) = reply {
@@ -587,7 +600,11 @@ impl Store {
             events.push(Some(payload));
         }
         // 512 endpoints can each contribute four old and new process records.
-        let limit = if key == "xui.state" { 2048 } else { 1024 };
+        let limit = if key == "xui.state" {
+            garde_config::MAX_OBSERVATION_BATCH
+        } else {
+            1024
+        };
         if publications.len() > limit || count > limit || now < 0 {
             return Err("event.invalid");
         }
@@ -704,13 +721,18 @@ impl Store {
     }
 
     pub(crate) fn admit(&mut self, count: i64, now: i64) -> Result<()> {
+        self.admit_with_reserve(count, now, false)
+    }
+
+    fn admit_with_reserve(&mut self, count: i64, now: i64, health_reply: bool) -> Result<()> {
         self.maintenance(now)?;
         let pending: i64 = sql(self.connection.query_row(
             "SELECT count(*) FROM deliveries WHERE state IN ('pending','in_flight')",
             [],
             |r| r.get(0),
         ))?;
-        if pending + count > i64::from(self.retention.pending_deliveries)
+        let limit = i64::from(self.retention.pending_deliveries) + i64::from(health_reply);
+        if (count > 0 && pending + count > limit)
             || self.used_bytes()? as u64 >= crate::retention::database_soft_limit(self.retention)
         {
             return Err("storage.quota");
@@ -743,12 +765,11 @@ impl Store {
         sql(transaction.execute("DELETE FROM cooldowns WHERE chat_id IN(SELECT chat_id FROM cooldowns WHERE until_at<=?1 LIMIT 16)",[now]))?;
         let removed = sql(transaction.execute(
             "DELETE FROM deliveries WHERE id IN (
-            SELECT d.id FROM deliveries d LEFT JOIN events e ON e.id=d.event_id
-            WHERE d.state IN ('delivered','dead_letter') AND
-            (d.updated_at<?1 OR ?2 OR e.created_at<?3 OR
+            SELECT id FROM deliveries WHERE state IN ('delivered','dead_letter') AND
+            (updated_at<?1 OR ?2 OR
             (SELECT count(*) FROM deliveries WHERE state IN ('delivered','dead_letter'))>10000)
-            ORDER BY d.updated_at,d.id LIMIT 16)",
-            params![now.saturating_sub(30 * 86400), pressure, cutoff],
+            ORDER BY updated_at,id LIMIT 16)",
+            params![cutoff, pressure],
         ))?;
         let events=sql(transaction.execute("DELETE FROM events WHERE id IN (SELECT id FROM events e WHERE NOT EXISTS(SELECT 1 FROM deliveries d WHERE d.event_id=e.id) AND (created_at<?1 OR ?2 OR (SELECT count(*) FROM events)>20000) ORDER BY created_at,id LIMIT 16)",params![cutoff,pressure]))?;
         let audit = crate::retention::prune_audit(&transaction, self.retention, now, pressure)?;

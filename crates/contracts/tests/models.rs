@@ -142,3 +142,16 @@ fn geoip_context_and_health_preserve_synthetic_examples_and_reject_unknown_field
     bad["action"]["ip"] = serde_json::json!("8.8.8.8");
     assert!(garde_contracts::decode_request(&bad.to_string()).is_err());
 }
+
+#[test]
+fn history_and_installation_health_preserve_wire_examples() {
+    roundtrip::<garde_contracts::HistoryPage>(include_str!(
+        "../../../fixtures/contracts/history-page.json"
+    ));
+    roundtrip::<garde_contracts::HistoryStats>(include_str!(
+        "../../../fixtures/contracts/history-stats.json"
+    ));
+    roundtrip::<garde_contracts::InstallationHealth>(include_str!(
+        "../../../fixtures/contracts/installation-health.json"
+    ));
+}

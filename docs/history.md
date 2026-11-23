@@ -17,7 +17,10 @@
 \`action_audit_days\` (30), \`process_audit_days\` (7), \`result_hours\` (24),
 \`database_mib\` (64), \`pending_deliveries\` (10000) и \`result_mib\` (32).
 При нехватке места удаляются доступные для очистки записи и приём приостанавливается.
-Ожидающие доставки сохраняются до обычного срока доставки. Завершённые файлы результатов
+Ожидающие доставки сохраняются до обычного срока доставки. Ограничение очереди от 2048
+сообщений вмещает одну публикацию наблюдений. Для \`/health\` есть одно дополнительное место.
+При нехватке места или блокировке более ранней команды используйте локальный \`--health\`.
+Срок завершённой доставки считают от результата. Событие хранится, пока на него ссылается доставка. Завершённые файлы результатов
 хранятся отдельно. Незавершённые операции не используют этот каталог. Перед уменьшением квоты
 базы проверьте её физический размер. Запуск с квотой ниже текущего размера завершается ошибкой.
 
@@ -41,7 +44,10 @@ using the permissions of the state directory. They write JSON to stdout. Exit 0 
 The optional \`retention\` section configures \`event_days\` (30), \`action_audit_days\` (30),
 \`process_audit_days\` (7), \`result_hours\` (24), \`database_mib\` (64), \`pending_deliveries\` (10000),
 and \`result_mib\` (32). Storage pressure prunes eligible records and can pause intake.
-Pending deliveries retain their usual deadlines. Completed result files live in a separate directory.
+Pending deliveries retain their usual deadlines. The 2048-message minimum fits one
+observation batch. The queue reserves one additional slot for \`/health\`.
+If disk is full or an earlier command is blocked, use local \`--health\`.
+Terminal delivery retention starts at the outcome. Events with delivery references remain available. Completed result files live in a separate directory.
 In-progress operations do not use it. Check the physical database size before lowering the quota.
 Startup fails if the database already exceeds the configured limit.
 

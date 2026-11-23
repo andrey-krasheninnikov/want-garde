@@ -123,7 +123,12 @@ pub fn inspect(config: &Config, query: Query, now: i64) -> Result<Output> {
             .ok_or("history.not_found")?;
             summary(&payload).map(Output::Event)
         }
-        Query::Stats(hours) => stats(&connection, hours, now).map(Output::Stats),
+        Query::Stats(hours) => {
+            let snapshot = sql(connection.unchecked_transaction())?;
+            let output = stats(&snapshot, hours, now)?;
+            sql(snapshot.commit())?;
+            Ok(Output::Stats(output))
+        }
         Query::Health => health(&connection, config, now).map(|h| Output::Health(Box::new(h))),
     }
 }
@@ -279,6 +284,7 @@ fn health(connection: &Connection, config: &Config, now: i64) -> Result<Installa
     let (action_audit_records, process_audit_records) = crate::retention::audit_counts(connection)?;
     let backpressure = delivery.pending.saturating_add(delivery.in_flight)
         >= policy.pending_deliveries
+        || u64::from(pages) * 4096 > policy.database_bytes()
         || occupied_bytes >= database_soft_limit(policy)
         || free_disk_bytes < disk_reserve(policy)
         || result_bytes >= policy.result_bytes()
@@ -328,13 +334,13 @@ impl Output {
             }
         }
         let event_line = |row: &EventSummary| {
-            crate::isolate(&format!(
-                "{} {} {} {}",
-                row.id.as_str(),
-                row.observed_at.to_rfc3339(),
-                row.source.as_str(),
-                severity(row.severity)
-            ))
+            [
+                crate::isolate(row.id.as_str()),
+                crate::isolate(&row.observed_at.to_rfc3339()),
+                crate::isolate(row.source.as_str()),
+                severity(row.severity).to_owned(),
+            ]
+            .join(" ")
         };
         let mut text = String::new();
         match self {
@@ -344,11 +350,7 @@ impl Output {
                     let _ = write!(text, "\n{}", event_line(event));
                 }
                 if let Some(cursor) = &page.next_cursor {
-                    let _ = write!(
-                        text,
-                        "\n{}",
-                        crate::isolate(&format!("/recent {} {cursor}", page.events.len()))
-                    );
+                    let _ = write!(text, "\n/recent {} {cursor}", page.events.len());
                 }
             }
             Self::Event(event) => {
@@ -378,12 +380,12 @@ impl Output {
                     let _ = write!(
                         text,
                         "\n{}",
-                        crate::isolate(&format!(
+                        format_args!(
                             "{} {}: {}",
-                            group.source.as_str(),
+                            crate::isolate(group.source.as_str()),
                             severity(group.severity),
                             group.count
-                        ))
+                        )
                     );
                 }
             }
