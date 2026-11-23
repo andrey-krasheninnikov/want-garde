@@ -116,6 +116,10 @@ See [service, port and baseline monitoring](services-ports.md) for configuration
 
 См. [read-only мониторинг x-ui](xui.md): отдельный helper, root-owned политика и диагностика. / See [read-only x-ui monitoring](xui.md) for the separate helper, root-owned policy, and diagnostics.
 
+## Optional Telegram routes / Необязательные маршруты Telegram
+
+По умолчанию daemon подключается к Telegram напрямую. Для другой сети настройте [цепочку исходящих маршрутов](telegram-egress.md). / The daemon connects to Telegram directly by default. If your network requires another route, configure the [Telegram egress chain](telegram-egress.md).
+
 ## Optional GeoIP / Необязательный GeoIP
 
 GeoIP включается отдельно после настройки IPinfo token. Перед включением прочитайте [передаваемые данные, лимиты и диагностику](geoip.md). / Enable GeoIP separately after configuring an IPinfo token. Read [data disclosure, limits and diagnostics](geoip.md) before enabling it.

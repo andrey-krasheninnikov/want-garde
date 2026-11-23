@@ -17,6 +17,7 @@ fn delivery_diagnostics_are_read_only_json_and_work_without_a_token() {
         geoip: Default::default(),
         retention: Default::default(),
         notification_policy: None,
+        telegram_egress: None,
         default_locale: "en".into(),
         ssh: Default::default(),
         owner_user_id: Some("123456789".into()),

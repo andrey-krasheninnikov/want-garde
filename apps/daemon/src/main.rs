@@ -232,6 +232,15 @@ async fn run() -> ExitCode {
     };
     drop(initial);
     if check {
+        if config.telegram_egress.is_some()
+            && let Err(code) = config.token().and_then(|token| {
+                garde_daemon::telegram::Telegram::configured(token, config.telegram_egress.as_ref())
+                    .map_err(|error| error.code)
+            })
+        {
+            eprintln!("{code}: {}", message(locale, "operation_failed"));
+            return ExitCode::from(2);
+        }
         println!("{}", message(locale, "configuration_valid"));
         return ExitCode::SUCCESS;
     }

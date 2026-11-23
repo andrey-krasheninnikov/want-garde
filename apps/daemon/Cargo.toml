@@ -17,12 +17,17 @@ serde.workspace = true
 serde_json.workspace = true
 chrono.workspace = true
 tokio = { version = "1.54", features = ["rt", "macros", "time", "signal", "sync", "process", "io-util", "net"] }
-reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "multipart", "rustls", "socks"] }
+rustls = { version = "0.23", default-features = false }
 rustix = { version = "1.1", features = ["fs", "process"] }
 garde-entrypoint = { path = "../../crates/entrypoint" }
 sha2 = "0.10"
 regex = "1.13"
 rusqlite = { version = "0.41.1", features = ["bundled"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+hickory-proto = "0.26.3"
+socket2 = { version = "0.6", features = ["all"] }
 
 [lints]
 workspace = true

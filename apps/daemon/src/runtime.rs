@@ -230,7 +230,10 @@ async fn poll_loop<T: Transport>(
 }
 
 pub async fn serve(config: Config) -> Result<()> {
-    let transport = Arc::new(Telegram::new(config.token()?).map_err(|error| error.code)?);
+    let transport = Arc::new(
+        Telegram::configured(config.token()?, config.telegram_egress.as_ref())
+            .map_err(|error| error.code)?,
+    );
     let database = Database::open(config.clone()).await?;
     let bot = Bot::new(config.clone())?;
     let id = database.call(|store| store.start_id()).await?;

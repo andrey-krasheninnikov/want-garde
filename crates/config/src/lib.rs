@@ -1,12 +1,14 @@
 mod geoip;
 mod notifications;
 mod retention;
+mod telegram_egress;
 pub use geoip::GeoIpConfig;
 pub use notifications::{
     MAX_NOTIFICATION_RECIPIENTS, NotificationOptions, NotificationRouting, Privacy,
     valid_notification_destination,
 };
 pub use retention::{MAX_OBSERVATION_BATCH, Retention};
+pub use telegram_egress::{MAX_TELEGRAM_ROUTES, TelegramEgress, TelegramRoute};
 mod notification_policy;
 pub use notification_policy::{NotificationPolicy, Preferences as NotificationPreferences};
 mod host;
@@ -57,6 +59,12 @@ pub struct Config {
     pub retention: Retention,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notification_policy: Option<NotificationPolicy>,
+    #[serde(
+        default,
+        deserialize_with = "telegram_egress::deserialize_section",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub telegram_egress: Option<TelegramEgress>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -141,6 +149,11 @@ impl Config {
             .notification_policy
             .as_ref()
             .is_some_and(|policy| !policy.valid())
+            || value.telegram_egress.as_ref().is_some_and(|egress| {
+                let mut reserved = vec![path, value.bot_token_file.as_path()];
+                reserved.extend(value.geoip.token_file.as_deref());
+                !egress.valid(&reserved)
+            })
             || !value.retention.valid()
             || !value.geoip.valid()
             || value
