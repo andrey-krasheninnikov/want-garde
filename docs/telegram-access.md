@@ -37,7 +37,7 @@
 
 Демон проверяет право перед чтением данных и перед постановкой ответа в очередь. Непосредственно перед каждым HTTP-запросом на отправку он снова проверяет право и фиксирует разрешение на попытку в SQLite. Для группы это происходит после проверки чата.
 
-Если отзыв или смена режима доставки фиксируется первым, попытка блокируется. Если первым зафиксировано разрешение на отправку, попытка может завершиться уже после отзыва. При переходе на другой маршрут и при повторной отправке проверка выполняется заново. Повторная выдача права не восстанавливает старые ответы или кнопки. Сообщения, которые Telegram уже принял, остаются доступными получателям.
+Если отзыв или смена режима доставки фиксируется первым, попытка блокируется. Если разрешение на отправку зафиксировано раньше, HTTP-запрос может начаться или завершиться после отзыва. При переходе на другой маршрут и при повторной отправке проверка выполняется заново. Повторная выдача права не восстанавливает старые ответы или кнопки. Сообщения, которые Telegram уже принял, остаются доступными получателям.
 
 ### Управление с VPS
 
@@ -70,7 +70,7 @@ A status refresh button is valid for up to five minutes from the time the reply 
 
 The daemon checks access before reading data and before queuing the reply. Immediately before every HTTP send attempt, it checks access again and commits the authorization in SQLite. For group replies, this happens after chat verification.
 
-If revocation or a change in delivery mode commits first, the attempt is blocked. An attempt whose authorization commits first may finish after revocation. Route fallback and later retries require a fresh check. Granting access again leaves earlier replies and buttons invalid. Messages Telegram already accepted remain available to recipients.
+If revocation or a change in delivery mode commits first, the attempt is blocked. The HTTP request may start or finish after revocation if its authorization commits first. Route fallback and later retries require a fresh check. Granting access again leaves earlier replies and buttons invalid. Messages Telegram already accepted remain available to recipients.
 
 ### Manage access on the VPS
 
