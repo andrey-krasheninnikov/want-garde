@@ -85,7 +85,8 @@ pub fn inspect(config: &Config, query: Query, now: i64) -> Result<Output> {
         Query::Recent { limit, before } => {
             let before = before.as_ref().map(|(at, id)| (*at, id.as_str()));
             let mut statement = sql(connection.prepare(
-                "SELECT payload,created_at FROM events WHERE ?1 IS NULL OR (created_at,id)<(?1,?2)
+                "SELECT payload,created_at FROM events WHERE (?1 IS NULL OR (created_at,id)<(?1,?2))
+                 AND json_extract(payload,'$.source')<>'summary'
                  ORDER BY created_at DESC,id DESC LIMIT ?3",
             ))?;
             let mut rows = sql(statement.query(params![
@@ -147,13 +148,13 @@ fn summary(payload: &str) -> Result<EventSummary> {
 fn stats(connection: &Connection, hours: u16, now: i64) -> Result<HistoryStats> {
     let cutoff = now.saturating_sub(i64::from(hours) * 3600);
     let total = sql(connection.query_row(
-        "SELECT count(*) FROM events WHERE created_at BETWEEN ?1 AND ?2",
+        "SELECT count(*) FROM events WHERE created_at BETWEEN ?1 AND ?2 AND json_extract(payload,'$.source')<>'summary'",
         params![cutoff, now],
         |r| r.get(0),
     ))?;
     let mut statement = sql(connection.prepare(
         "SELECT json_extract(payload,'$.source'),json_extract(payload,'$.classification.severity'),count(*)
-         FROM events WHERE created_at BETWEEN ?1 AND ?2
+         FROM events WHERE created_at BETWEEN ?1 AND ?2 AND json_extract(payload,'$.source')<>'summary'
          GROUP BY 1,2 ORDER BY 3 DESC,1,2 LIMIT 24",
     ))?;
     let rows = sql(statement.query_map(params![cutoff, now], |r| {

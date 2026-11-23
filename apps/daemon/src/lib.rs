@@ -15,6 +15,7 @@ pub mod host;
 pub mod host_health;
 pub mod ingest;
 pub mod listeners;
+mod notification_policy;
 mod observation;
 pub mod retention;
 pub mod runtime;
@@ -189,7 +190,25 @@ impl Bot {
             .command(update, username)
             .and_then(|(command, args)| history::Query::parse(command.strip_prefix('/')?, &args));
         let health_reply = matches!(history.as_ref(), Some(Ok(history::Query::Health)));
-        let reply = if let Some(query) = history {
+        let reply = if self
+            .command(update, username)
+            .is_some_and(|(command, args)| command == "/notifications" && args.is_empty())
+        {
+            Some(Reply {
+                envelope: Default::default(),
+                locale: None,
+                chat_id: self.config.owner()?.into(),
+                text: notification_policy::render_status(
+                    &self.config,
+                    &self.locale,
+                    runtime::now(),
+                )
+                .unwrap_or_else(|code| {
+                    eprintln!("{code}");
+                    message(&self.locale, "operation_failed").into()
+                }),
+            })
+        } else if let Some(query) = history {
             let text = match query
                 .and_then(|query| history::inspect(&self.config, query, runtime::now()))
             {
