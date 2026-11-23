@@ -10,6 +10,8 @@ publish = false
 garde-contracts.workspace = true
 garde-entrypoint = { path = "../entrypoint" }
 serde.workspace = true
+chrono.workspace = true
+chrono-tz = { version = "=0.10.4", features = ["serde"] }
 serde_json.workspace = true
 rustix = { version = "1.1", features = ["fs", "process"] }
 

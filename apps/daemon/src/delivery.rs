@@ -433,7 +433,7 @@ impl Store {
             }
             return self.publish_source_checkpoint(None, &[], now, checkpoint, kind);
         }
-        self.admit(replies.len() as i64, now)?;
+        self.admit(self.event_reply_admission(replies.len()), now)?;
         let transaction = sql(self.connection.transaction())?;
         sql(transaction.execute(
             "INSERT INTO events VALUES(?1,?2,?3)",
@@ -615,7 +615,7 @@ impl Store {
         if publications.len() > limit || count > limit * MAX_NOTIFICATION_RECIPIENTS || now < 0 {
             return Err("event.invalid");
         }
-        self.admit(count as i64, now)?;
+        self.admit(self.event_reply_admission(count), now)?;
         let transaction = sql(self.connection.transaction())?;
         for ((event, replies), payload) in publications.iter().zip(events) {
             let Some(payload) = payload else { continue };
@@ -747,6 +747,19 @@ impl Store {
             .connection
             .query_row("PRAGMA freelist_count", [], |r| r.get(0)))?;
         Ok((pages - free) * 4096)
+    }
+
+    fn event_reply_admission(&self, count: usize) -> i64 {
+        if self
+            .geoip_config
+            .as_ref()
+            .is_some_and(|config| config.notification_policy.is_some())
+        {
+            // Policy decides the actual number of deliveries in the publication transaction.
+            0
+        } else {
+            count as i64
+        }
     }
 
     pub(crate) fn admit(&mut self, count: i64, now: i64) -> Result<()> {
@@ -1047,6 +1060,21 @@ fn enqueue_event(
     let context = crate::geoip::record(transaction, event, config, now)?;
     let owner = config.and_then(|config| config.owner_user_id.as_deref());
     for reply in replies {
+        if let Some(config) = config
+            && let Some(policy) = &config.notification_policy
+        {
+            if !crate::notification_policy::select(transaction, policy, event, reply, now)? {
+                continue;
+            }
+            let pending: u32 = sql(transaction.query_row(
+                "SELECT count(*) FROM deliveries WHERE state IN ('pending','in_flight')",
+                [],
+                |r| r.get(0),
+            ))?;
+            if pending >= config.retention.pending_deliveries {
+                return Err("storage.quota");
+            }
+        }
         let body = &reply.text;
         let locale = reply
             .locale
@@ -1095,7 +1123,7 @@ fn enqueue_event(
     Ok(())
 }
 
-fn enqueue(
+pub(crate) fn enqueue(
     transaction: &rusqlite::Transaction<'_>,
     event: Option<&str>,
     request: Option<&str>,

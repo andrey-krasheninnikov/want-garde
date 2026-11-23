@@ -7,6 +7,8 @@ pub use notifications::{
     valid_notification_destination,
 };
 pub use retention::{MAX_OBSERVATION_BATCH, Retention};
+mod notification_policy;
+pub use notification_policy::{NotificationPolicy, Preferences as NotificationPreferences};
 mod host;
 mod monitoring;
 mod xui;
@@ -53,6 +55,8 @@ pub struct Config {
     pub geoip: GeoIpConfig,
     #[serde(default)]
     pub retention: Retention,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notification_policy: Option<NotificationPolicy>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -133,7 +137,11 @@ impl Config {
         let value: Self =
             serde_json::from_slice(&read_private(path, 65536)?).map_err(|_| "config.invalid")?;
         let valid_source = |source: &SshConfig| !matches!(source, SshConfig::File { path } if !path.is_absolute() || path.components().any(|p| matches!(p, std::path::Component::ParentDir)) || path.as_os_str().len() > 4096);
-        if !value.retention.valid()
+        if value
+            .notification_policy
+            .as_ref()
+            .is_some_and(|policy| !policy.valid())
+            || !value.retention.valid()
             || !value.geoip.valid()
             || value
                 .geoip
