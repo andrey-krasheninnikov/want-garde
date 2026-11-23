@@ -468,3 +468,30 @@ async fn an_empty_daily_summary_queued_during_quiet_hours_survives_midnight() {
     assert!(summaries[0].text.contains("Events: 0"));
     assert!(summaries[0].text.contains("2026-01-05T23:30:00"));
 }
+
+#[tokio::test]
+async fn a_missed_daily_inside_elapsed_retention_survives_a_spring_clock_change() {
+    let dir = private_dir();
+    let mut config = config(
+        dir.path(),
+        json!({
+            "default_preferences":{"daily":{"at":"23:30"},"time_zone":"America/New_York"},
+            "recipients":{"123456788":{}}
+        }),
+    );
+    config.retention.event_days = 1;
+    let db = open(config.clone()).await;
+    let before = at("2026-03-08T04:00:00Z");
+    db.call(move |s| s.tick_notifications(before))
+        .await
+        .unwrap();
+    drop(db);
+    let db = open(config).await;
+    let recovered = at("2026-03-09T04:15:00Z");
+    db.call(move |s| s.tick_notifications(recovered))
+        .await
+        .unwrap();
+    let summaries = claim(&db, recovered).await;
+    assert_eq!(summaries.len(), 1);
+    assert!(summaries[0].text.contains("2026-03-08T04:30:00"));
+}

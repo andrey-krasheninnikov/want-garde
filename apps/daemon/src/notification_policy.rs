@@ -185,7 +185,7 @@ pub(crate) fn select(
 }
 
 use crate::delivery::Store;
-use chrono::{Days, NaiveDate};
+use chrono::NaiveDate;
 use garde_config::NotificationPreferences;
 use garde_contracts::{Classification, Id, WireVersion};
 use garde_entrypoint::message;
@@ -311,10 +311,16 @@ fn daily_slot(
     Err("service.clock")
 }
 
-fn daily_date(last: Option<&str>, today: NaiveDate, retention_days: u16) -> Result<NaiveDate> {
-    let oldest = today
-        .checked_sub_days(Days::new(u64::from(retention_days)))
-        .ok_or("service.clock")?;
+fn daily_date(
+    pref: &NotificationPreferences,
+    last: Option<&str>,
+    today: NaiveDate,
+    cutoff: i64,
+) -> Result<NaiveDate> {
+    let oldest = DateTime::<Utc>::from_timestamp(cutoff, 0)
+        .ok_or("service.clock")?
+        .with_timezone(&pref.time_zone)
+        .date_naive();
     Ok(last
         .map(next_date)
         .transpose()?
@@ -376,7 +382,9 @@ impl Store {
                 |r| r.get(0),
             )
             .optional())?;
-        let date = daily_date(last.as_deref(), today, self.retention.event_days)?;
+        let timestamp = now.timestamp();
+        let cutoff = timestamp.saturating_sub(i64::from(self.retention.event_days) * 86400);
+        let date = daily_date(pref, last.as_deref(), today, cutoff)?;
         if last.is_none() {
             let yesterday = today.pred_opt().ok_or("service.clock")?;
             sql(self.connection.execute(
@@ -387,8 +395,6 @@ impl Store {
         if date > today {
             return Ok(());
         }
-        let timestamp = now.timestamp();
-        let cutoff = timestamp.saturating_sub(i64::from(self.retention.event_days) * 86400);
         let (date, at) = daily_slot(pref, date, cutoff)?;
         if at > timestamp {
             return Ok(());
@@ -520,8 +526,8 @@ pub(crate) fn render_status(
                     |r| r.get(0),
                 )
                 .optional())?;
-            let next = daily_date(last.as_deref(), local_today, config.retention.event_days)?;
             let cutoff = now.saturating_sub(i64::from(config.retention.event_days) * 86400);
+            let next = daily_date(pref, last.as_deref(), local_today, cutoff)?;
             let (_, stamp) = daily_slot(pref, next, cutoff)?;
             let due = DateTime::<Utc>::from_timestamp(stamp, 0).ok_or("service.clock")?;
             let _ = write!(
