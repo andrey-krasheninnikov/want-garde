@@ -2,8 +2,9 @@
 
 ## Русский
 
-Владелец в личном Telegram-чате может запросить `/recent [1–10 [CURSOR]]`, `/history EVENT_ID`,
-`/stats [1–168]` и `/health`. `/recent` выдаёт до 10 записей в порядке сохранения и показывает
+`/recent [1–10 [CURSOR]]`, `/history EVENT_ID` и `/stats [1–168]` доступны владельцу
+в личном чате и пользователям с [разрешением `events.read`](telegram-access.md#настройка-доступа).
+`/health` доступна только владельцу в личном чате. `/recent` выдаёт до 10 записей в порядке сохранения и показывает
 команду для следующей страницы. В истории видны исходное время, источник, важность и ID.
 `/stats` считает сохранённые события за последние 24 часа по умолчанию и показывает до 24 групп.
 `/health` показывает наблюдение, пропуски, очередь, ошибки доставки и использование хранилища.
@@ -32,8 +33,9 @@
 
 ## English
 
-The owner can use `/recent [1–10 [CURSOR]]`, `/history EVENT_ID`, `/stats [1–168]`, and `/health`
-in a private Telegram chat. Recent history lists up to ten events in storage order and includes
+The owner can use `/recent [1–10 [CURSOR]]`, `/history EVENT_ID`, and `/stats [1–168]` in private.
+Other callers need the [`events.read` grant](telegram-access.md#set-up-access). Only the owner
+can use `/health` in a private chat. Recent history lists up to ten events in storage order and includes
 a command for the next page. Entries show the original time, source, severity, and ID.
 Stats cover the last 24 hours by default and list up to 24 groups. Health reports source coverage,
 gaps, queued deliveries, delivery errors, and storage usage.

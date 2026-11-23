@@ -2,7 +2,7 @@
 
 ## Русский
 
-Сервис обслуживает один Linux VPS и отдельный Telegram bot token через HTTPS polling. В личном чате владельцу доступны `/start`, `/help`, `/status`, `/delivery`, `/ssh`, `/bans` и `/language`. Неизвестные пользователи, группы, callbacks и edited messages не получают состояние. Первичная привязка выполняется локально; username и статус администратора группы не дают доступа.
+Сервис обслуживает один Linux VPS и отдельный Telegram bot token через HTTPS polling. Владелец может вызвать `/start`, `/help`, `/status`, `/delivery`, `/ssh`, `/health`, `/bans`, `/language` и `/access` в личном чате. Делегированные команды и нажатия кнопок требуют разрешения для пользователя, чата и функции. Сервис обрабатывает исходные сообщения. Первичная привязка выполняется локально. Имя пользователя и роль администратора группы не дают доступа. См. [настройку прав Telegram](telegram-access.md#настройка-доступа).
 
 ### Подготовка
 
@@ -66,7 +66,7 @@ sudo systemctl restart want-garde.service
 
 ## English
 
-The service runs on one Linux VPS with a dedicated Telegram bot token and HTTPS polling. The owner can use `/start`, `/help`, `/status`, `/delivery`, `/ssh`, `/bans`, and `/language` in a private chat. Unknown users, groups, callbacks, and edited messages receive no host status. Initial binding is local; usernames and group-administrator status grant no access.
+The service runs on one Linux VPS with a dedicated Telegram bot token and HTTPS polling. The owner can use `/start`, `/help`, `/status`, `/delivery`, `/ssh`, `/health`, `/bans`, `/language`, and `/access` in a private chat. Delegated commands and button presses require a grant for the user, chat, and capability. The service processes original messages. Initial binding is local. Usernames and group administrator roles grant no access. See [Telegram permissions](telegram-access.md#set-up-access).
 
 ### Preparation
 

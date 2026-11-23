@@ -27,11 +27,11 @@
 Неизвестная unit, ошибка доступа, timeout или неизвестный формат показывают потерю покрытия.
 Наблюдение дискретное: изменения между проверками могут не попасть в снимки.
 
-`/services [PAGE]` и `/ports [PAGE]` доступны только владельцу в личном чате.
-Страница содержит до восьми строк. Текстовые значения ограничены 128 символами;
-полные доступные данные остаются в локальном JSON. Группы, чужие пользователи,
-callbacks и edited messages не получают сведения. Команды читают сохранённый снимок;
-после двух интервалов или при обратном ходе времени он считается устаревшим.
+`/services [PAGE]` и `/ports [PAGE]` доступны владельцу в личном чате. Для делегирования
+используйте [разрешения](telegram-access.md#настройка-доступа) `services.read` и `ports.read`
+соответственно. Страница содержит до восьми строк. Текстовые значения ограничены 128 символами.
+Полные доступные данные остаются в локальном JSON. Команды читают сохранённый снимок.
+После двух интервалов или при обратном ходе времени снимок считается устаревшим.
 
 Первый полный снимок endpoints создаёт baseline с отдельным событием.
 Неполные сведения о процессах не мешают сохранению полного набора endpoints.
@@ -127,10 +127,11 @@ critical, including first observation. Returning to `active` produces recovery; 
 Transitional states and unavailable data never clear a known failure. Unknown units, permission
 errors, timeouts and unsupported output visibly limit coverage. Changes between polls can be missed.
 
-The owner uses `/services [PAGE]` and `/ports [PAGE]` in a private chat. Groups, strangers,
-callbacks and edited messages receive no data. Each page has up to eight rows; displayed values
-are bounded to 128 characters. Full available values remain in local JSON. Commands read saved
-observations, marked stale after two intervals or a backwards clock change.
+The owner can use `/services [PAGE]` and `/ports [PAGE]` in private. Delegate them with the
+[`services.read` and `ports.read` grants](telegram-access.md#set-up-access), respectively.
+Each page has up to eight rows. Displayed values are limited to 128 characters. Full values
+remain in local JSON. Commands read saved observations, marked stale after two intervals
+or a backwards clock change.
 
 The first complete endpoint snapshot initializes a durable baseline with a separate event.
 Partial process metadata does not invalidate a complete endpoint set. Later observations never
