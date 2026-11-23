@@ -2,7 +2,7 @@
 
 ## Русский
 
-Сервис обслуживает один Linux VPS и отдельный Telegram bot token через HTTPS polling. В личном чате владельцу доступны `/start`, `/help`, `/status`, `/delivery`, `/ssh`, `/bans` и `/language`. Неизвестные пользователи, группы, callbacks и edited messages не получают состояние. Первичная привязка выполняется локально; username и статус администратора группы не дают доступа.
+Сервис обслуживает один Linux VPS и отдельный Telegram bot token через HTTPS polling. Владелец может вызвать `/start`, `/help`, `/status`, `/delivery`, `/ssh`, `/health`, `/bans`, `/language` и `/access` в личном чате. Делегированные команды и нажатия кнопок требуют разрешения для пользователя, чата и функции. Сервис обрабатывает исходные сообщения. Первичная привязка выполняется локально. Имя пользователя и роль администратора группы не дают доступа. См. [настройку прав Telegram](telegram-access.md#настройка-доступа).
 
 ### Подготовка
 
@@ -42,7 +42,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now want-garde.service
 ```
 
-Токен вводится редактором в отдельный файл, одной строкой. Не передавайте его через аргументы, shell history, Git или сообщения. В config задайте стабильный `server_id`, абсолютные `bot_token_file` и `state_dir`, поддерживаемый `default_locale`. Начальный `owner_user_id` равен null; CLI сохраняет десятичную строку. Повтор того же ID успешен; другой ID отклоняется. CLI сохраняет mode/group конфигурации. Не изменяйте привязку при работающем сервисе: изменения конфигурации применяются после restart.
+Токен вводится редактором в отдельный файл, одной строкой. Не передавайте его через аргументы, shell history, Git или сообщения. В config задайте стабильный `server_id`, абсолютные `bot_token_file` и `state_dir`, поддерживаемый `default_locale`. Начальный `owner_user_id` равен null; CLI сохраняет десятичную строку. Повтор того же ID успешен; другой ID отклоняется. CLI сохраняет mode/group конфигурации. Не изменяйте привязку при работающем сервисе: изменения конфигурации применяются после restart. Делегируйте отдельные команды по [инструкции доступа в Telegram](telegram-access.md#настройка-доступа).
 
 ### Проверка и остановка
 
@@ -66,7 +66,7 @@ sudo systemctl restart want-garde.service
 
 ## English
 
-The service runs on one Linux VPS with a dedicated Telegram bot token and HTTPS polling. The owner can use `/start`, `/help`, `/status`, `/delivery`, `/ssh`, `/bans`, and `/language` in a private chat. Unknown users, groups, callbacks, and edited messages receive no host status. Initial binding is local; usernames and group-administrator status grant no access.
+The service runs on one Linux VPS with a dedicated Telegram bot token and HTTPS polling. The owner can use `/start`, `/help`, `/status`, `/delivery`, `/ssh`, `/health`, `/bans`, `/language`, and `/access` in a private chat. Delegated commands and button presses require a grant for the user, chat, and capability. The service processes original messages. Initial binding is local. Usernames and group administrator roles grant no access. See [Telegram permissions](telegram-access.md#set-up-access).
 
 ### Preparation
 
@@ -76,7 +76,7 @@ The manual CI workflow produces a development artifact named `linux-x86_64-<comm
 
 The installation commands above apply to a new installation. Inspect any existing `want-garde` account, unit, or directory before reuse. Replace `<commit>` with the reviewed full SHA and `123456789` with your Telegram user ID. The commands create a separate system account, restricted configuration/token files, a private state directory, an immutable binary directory, and a `current` symlink. Enable the unit only after `--check-config` succeeds as the service user.
 
-Enter the token as one line using an editor, never through arguments, shell history, Git, or messages. Configure a stable `server_id`, absolute `bot_token_file` and `state_dir` paths, and a supported `default_locale`. The initial `owner_user_id` is null. The local CLI stores a decimal string, accepts the same ID idempotently, refuses another ID, and preserves configuration mode/group. Bind or change configuration while the service is stopped; restart to apply changes.
+Enter the token as one line using an editor, never through arguments, shell history, Git, or messages. Configure a stable `server_id`, absolute `bot_token_file` and `state_dir` paths, and a supported `default_locale`. The initial `owner_user_id` is null. The local CLI stores a decimal string, accepts the same ID idempotently, refuses another ID, and preserves configuration mode/group. Bind or change configuration while the service is stopped; restart to apply changes. See [Telegram access](telegram-access.md#set-up-access) to delegate individual commands.
 
 ### Verification and shutdown
 

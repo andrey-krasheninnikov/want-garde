@@ -35,7 +35,7 @@ systemctl restart want-garde
 
 ### Просмотр и события
 
-`/xui [PAGE]` показывает состояние источников и клиентов по восемь строк. Команда доступна владельцу в личном чате. `/language` сохраняет язык; новые сообщения используют общий каталог 12 языков и изоляцию динамических значений для ar/he.
+`/xui [PAGE]` показывает состояние источников и клиентов по восемь строк. Команда доступна владельцу в личном чате и пользователям с [разрешением `xui.read`](telegram-access.md#настройка-доступа). `/language` сохраняет язык владельца. Сообщения используют общий каталог 12 языков и изоляцию динамических значений для ar/he.
 
 ```sh
 sudo -u want-garde /usr/local/lib/want-garde/current/want-garde-daemon --xui-status --config /etc/want-garde/config.json
@@ -51,7 +51,7 @@ sudo -u want-garde /usr/local/lib/want-garde/current/want-garde-daemon --xui-sta
 
 ### Приватность и ограничения
 
-Конфигурационные значения сохраняются только как полные fingerprints SHA-256. Уведомления содержат идентификаторы объектов и имена изменённых полей. Пароли, UUID авторизации, subscription tokens, приватные ключи, JSON настроек и сырые строки журналов не сохраняются и не отправляются. Метки клиентов и сетевые endpoints из распознанных access records видны владельцу; они входят в историю событий.
+Конфигурационные значения сохраняются только как полные fingerprints SHA-256. Уведомления содержат идентификаторы объектов и имена изменённых полей. Пароли, UUID авторизации, subscription tokens, приватные ключи, JSON настроек и сырые строки журналов не сохраняются и не отправляются. Метки клиентов и сетевые endpoints из распознанных access records входят в историю событий.
 
 База открывается read-only, с `query_only`, отключённым trusted schema и короткой транзакцией. Для работающей панели не используется `immutable=1`. В режиме WAL уже существующие sidecars должны быть доступны для чтения; helper не создаёт и не чинит файлы панели. Блокировка базы, неизвестная схема, повреждение и ошибки прав дают диагностику. Остальные мониторы продолжают работу.
 
@@ -77,7 +77,7 @@ Panel file permissions stay unchanged. The daemon gains neither root, raw databa
 
 ### Observe and diagnose
 
-`/xui [PAGE]` shows source health and eight clients per page, only to the owner in private chat. `/language` remains persistent; messages use all 12 locales with dynamic-value isolation for ar/he.
+`/xui [PAGE]` shows source health and eight clients per page. The owner can use it in private. Other callers need the [`xui.read` grant](telegram-access.md#set-up-access). `/language` saves the owner's locale. Messages use all 12 locales with dynamic-value isolation for ar/he.
 
 The local diagnostic command above reads saved state without a token, helper requests, or database writes. Exit codes: 0 for disabled or healthy monitoring; 1 for stale/incomplete coverage; 2 for configuration/storage errors.
 
@@ -89,7 +89,7 @@ Table/column detection supports normalized `clients`/`client_inbounds` and embed
 
 ### Privacy and limits
 
-Configuration values are stored only as full SHA-256 fingerprints. Notifications identify objects and changed field names. Passwords, authorization UUIDs, subscription tokens, private keys, configuration JSON, and raw log lines are neither persisted nor sent. Recognized client labels and network endpoints are visible to the owner and stored in event history.
+Configuration values are stored only as full SHA-256 fingerprints. Notifications identify objects and changed field names. Passwords, authorization UUIDs, subscription tokens, private keys, configuration JSON, and raw log lines are neither persisted nor sent. Recognized client labels and network endpoints are stored in event history.
 
 The reader uses read-only SQLite, `query_only`, disabled trusted schema, and a short transaction. It does not use `immutable=1` against a running panel. WAL requires readable existing sidecars; the helper never creates or repairs panel files. Locks, unsupported schemas, corruption, and access failures produce diagnostics while other monitors continue.
 

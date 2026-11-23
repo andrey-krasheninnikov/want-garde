@@ -1,4 +1,7 @@
-use crate::{DeliveryEnvelope, Reply};
+use crate::{
+    DeliveryEnvelope, Reply,
+    access::{self, Button, Proof, ProtectedReply},
+};
 use chrono::{DateTime, Utc};
 use garde_config::{MAX_NOTIFICATION_RECIPIENTS, Result, valid_notification_destination};
 use garde_contracts::{DeliveryHealth, DeliveryProblem, DeliveryState, Event, Id, WireVersion};
@@ -22,6 +25,7 @@ pub struct Delivery {
     pub id: i64,
     pub reply: Reply,
     pub attempts: u32,
+    pub(crate) protected: Option<ProtectedReply>,
 }
 #[derive(Clone, Copy)]
 pub enum Outcome {
@@ -137,7 +141,7 @@ impl Store {
         if page_size != 4096 {
             return Err("storage.version");
         }
-        if ![0, 1, 2].contains(&version) {
+        if ![0, 1, 2, 3].contains(&version) {
             return Err("storage.version");
         }
         if version == 0 {
@@ -192,6 +196,7 @@ impl Store {
                 sql(transaction.execute("INSERT INTO meta VALUES(?1,?2)", params![key, value]))?;
             }
             add_delivery_envelope(&transaction)?;
+            access::migrate(&transaction)?;
             sql(transaction.commit())?;
         }
         for (key, value) in [("server", server), ("owner", owner)] {
@@ -223,13 +228,20 @@ impl Store {
         if let Some(saved) = saved {
             crate::ssh::State::decode(&saved)?;
         }
-        if version == 1 {
+        if version == 2 || version == 3 {
+            sql(connection.prepare(
+                "SELECT topic_id,silent,protect_content,redacted FROM deliveries LIMIT 0",
+            ))?;
+        }
+        if version == 1 || version == 2 {
             let transaction = sql(connection.transaction())?;
-            add_delivery_envelope(&transaction)?;
+            if version == 1 {
+                add_delivery_envelope(&transaction)?;
+            }
+            access::migrate(&transaction)?;
             sql(transaction.commit())?;
         }
-        sql(connection
-            .prepare("SELECT topic_id,silent,protect_content,redacted FROM deliveries LIMIT 0"))?;
+        access::validate(&connection)?;
         sql(connection.execute("UPDATE deliveries SET state='pending',uncertain=1,last_error='delivery.uncertain' WHERE state='in_flight'",[]))?;
         crate::geoip::initialize(&connection)?;
         crate::retention::initialize(&connection)?;
@@ -332,6 +344,48 @@ impl Store {
         now: i64,
         health_reply: bool,
     ) -> Result<i64> {
+        self.consume_with(id, now, reply.is_some(), health_reply, |_| {
+            Ok(reply.map(|reply| (reply, None)))
+        })
+    }
+
+    pub(crate) fn consume_protected_update(
+        &mut self,
+        id: i64,
+        reply: Reply,
+        proof: Proof,
+        add_button: bool,
+        now: i64,
+    ) -> Result<(i64, bool)> {
+        let mut accepted = false;
+        let offset = self.consume_with(id, now, true, false, |transaction| {
+            if !access::recheck(transaction, proof, "reply_queued", now)? {
+                return Ok(None);
+            }
+            let button = if add_button {
+                Some(Button {
+                    token: access::issue_button(transaction, proof, now)?,
+                    locale: reply.locale.clone().ok_or("delivery.invalid")?,
+                })
+            } else {
+                None
+            };
+            accepted = true;
+            Ok(Some((reply, Some(ProtectedReply { proof, button }))))
+        })?;
+        Ok((offset, accepted))
+    }
+
+    pub(crate) fn consume_with(
+        &mut self,
+        id: i64,
+        now: i64,
+        needs_slot: bool,
+        health_reply: bool,
+        build: impl FnOnce(
+            &rusqlite::Transaction<'_>,
+        ) -> Result<Option<(Reply, Option<ProtectedReply>)>>,
+    ) -> Result<i64> {
         if !(0..i64::MAX).contains(&id) {
             return Err("request.invalid");
         }
@@ -339,21 +393,22 @@ impl Store {
         if id < offset {
             return Ok(offset);
         }
-        if reply.is_some() {
+        if needs_slot {
             self.admit_with_reserve(1, now, health_reply)?;
         }
         let transaction = sql(self.connection.transaction())?;
-        if let Some(reply) = reply {
+        if let Some((reply, protected)) = build(&transaction)? {
             let epoch: String =
                 sql(transaction
                     .query_row("SELECT value FROM meta WHERE key='epoch'", [], |r| r.get(0)))?;
-            enqueue(
+            enqueue_message(
                 &transaction,
                 None,
                 Some(&format!("telegram:{epoch}:{id}")),
                 &reply,
                 now,
-                600,
+                access::PROOF_TTL,
+                protected.as_ref(),
             )?;
         }
         let next = id + 1;
@@ -700,36 +755,56 @@ impl Store {
             )
         };
         let statement = format!(
-            "SELECT id,chat_id,text,attempts,topic_id,silent,protect_content,redacted
+            "SELECT id,chat_id,text,attempts,topic_id,silent,protect_content,redacted,access_proof,access_button
              FROM deliveries d WHERE state='pending' AND next_at<=?1 AND expires_at>?1 AND attempts<128
              AND NOT EXISTS(SELECT 1 FROM deliveries a WHERE a.chat_id=d.chat_id AND a.state='in_flight')
              AND NOT EXISTS(SELECT 1 FROM cooldowns c WHERE c.chat_id=d.chat_id AND c.until_at>?1)
              {quiet_clause}
              ORDER BY next_at,id LIMIT 1");
         let mut statement_handle = sql(transaction.prepare_cached(&statement))?;
-        let mut value = sql(statement_handle
+        let row = sql(statement_handle
             .query_row(parameters, |r| {
-                Ok(Delivery {
-                    id: r.get(0)?,
-                    attempts: r.get::<_, u32>(3)? + 1,
-                    reply: Reply {
-                        locale: None,
-                        chat_id: r.get(1)?,
-                        text: r.get(2)?,
-                        envelope: DeliveryEnvelope {
-                            topic_id: r.get(4)?,
-                            silent: r.get(5)?,
-                            protect_content: r.get(6)?,
-                            redacted: r.get(7)?,
+                Ok((
+                    Delivery {
+                        id: r.get(0)?,
+                        attempts: r.get::<_, u32>(3)? + 1,
+                        protected: None,
+                        reply: Reply {
+                            locale: None,
+                            chat_id: r.get(1)?,
+                            text: r.get(2)?,
+                            envelope: DeliveryEnvelope {
+                                topic_id: r.get(4)?,
+                                silent: r.get(5)?,
+                                protect_content: r.get(6)?,
+                                redacted: r.get(7)?,
+                            },
                         },
                     },
-                })
+                    r.get::<_, Option<String>>(8)?,
+                    r.get::<_, Option<String>>(9)?,
+                ))
             })
             .optional())?;
         drop(statement_handle);
-        if let Some(value) = &mut value {
-            crate::geoip::prepare_delivery(&transaction, value)?;
-            sql(transaction.execute("UPDATE deliveries SET state='in_flight',attempts=attempts+1,updated_at=?1,next_at=?3 WHERE id=?2",params![now,value.id,now.saturating_add(backoff(value.attempts) as i64)]))?;
+        let mut value = None;
+        if let Some((mut delivery, proof, button)) = row {
+            if let Some(proof) = proof {
+                let proof = access::decode(&proof)?;
+                let destination = proof.destination();
+                if delivery.reply.chat_id != destination.chat.to_string()
+                    || delivery.reply.envelope.topic_id != destination.topic
+                {
+                    return Err("storage.corrupt");
+                }
+                let button = button
+                    .map(|data| serde_json::from_str(&data).map_err(|_| "storage.corrupt"))
+                    .transpose()?;
+                delivery.protected = Some(ProtectedReply { proof, button });
+            }
+            crate::geoip::prepare_delivery(&transaction, &mut delivery)?;
+            sql(transaction.execute("UPDATE deliveries SET state='in_flight',attempts=attempts+1,updated_at=?1,next_at=?3 WHERE id=?2",params![now,delivery.id,now.saturating_add(backoff(delivery.attempts) as i64)]))?;
+            value = Some(delivery);
         }
         sql(transaction.commit())?;
         Ok(value)
@@ -873,7 +948,8 @@ impl Store {
         if self.notification_tables {
             crate::notification_policy::prune(&transaction, cutoff, now)?;
         }
-        let audit = crate::retention::prune_audit(&transaction, self.retention, now, pressure)?;
+        let audit = crate::retention::prune_audit(&transaction, self.retention, now, pressure)?
+            + access::prune_audit(&transaction, self.retention.action_audit_days, now)?;
         if removed + events + audit > 0 {
             sql(transaction.execute("UPDATE meta SET value=min(4294967295,CAST(value AS INTEGER)+?1) WHERE key='pruned'",[(removed+events+audit) as i64]))?;
         }
@@ -950,7 +1026,7 @@ pub(crate) fn inspect_connection(
     ))?;
     sql(connection.busy_timeout(Duration::from_millis(250)))?;
     let version: i64 = sql(connection.query_row("PRAGMA user_version", [], |r| r.get(0)))?;
-    if ![1, 2].contains(&version) {
+    if ![1, 2, 3].contains(&version) {
         return Err("storage.version");
     }
     for (key, value) in [("server", server), ("owner", owner)] {
@@ -1195,6 +1271,18 @@ pub(crate) fn enqueue(
     now: i64,
     ttl: i64,
 ) -> Result<()> {
+    enqueue_message(transaction, event, request, reply, now, ttl, None)
+}
+
+fn enqueue_message(
+    transaction: &rusqlite::Transaction<'_>,
+    event: Option<&str>,
+    request: Option<&str>,
+    reply: &Reply,
+    now: i64,
+    ttl: i64,
+    protected: Option<&ProtectedReply>,
+) -> Result<()> {
     let DeliveryEnvelope {
         topic_id,
         silent,
@@ -1202,17 +1290,24 @@ pub(crate) fn enqueue(
         redacted,
     } = reply.envelope;
     if !valid_notification_destination(&reply.chat_id, topic_id)
-        || (event.is_none() && reply.chat_id.starts_with('-'))
+        || (event.is_none() && reply.chat_id.starts_with('-') && protected.is_none())
         || reply.text.encode_utf16().count() > 3900
         || now < 0
     {
         return Err("delivery.invalid");
     }
+    let proof = protected
+        .map(|access| access::encode(access.proof))
+        .transpose()?;
+    let button = protected
+        .and_then(|access| access.button.as_ref())
+        .map(|button| serde_json::to_string(button).map_err(|_| "storage.failed"))
+        .transpose()?;
     let expires = now.checked_add(ttl).ok_or("delivery.invalid")?;
     sql(transaction.execute(
-        "INSERT INTO deliveries(event_id,request_id,chat_id,text,next_at,created_at,updated_at,expires_at,topic_id,silent,protect_content,redacted)
-         VALUES(?1,?2,?3,?4,?5,?5,?5,?6,?7,?8,?9,?10)",
-        params![event,request,reply.chat_id,reply.text,now,expires,topic_id,silent,protect_content,redacted],
+        "INSERT INTO deliveries(event_id,request_id,chat_id,text,next_at,created_at,updated_at,expires_at,topic_id,silent,protect_content,redacted,access_proof,access_button)
+         VALUES(?1,?2,?3,?4,?5,?5,?5,?6,?7,?8,?9,?10,?11,?12)",
+        params![event,request,reply.chat_id,reply.text,now,expires,topic_id,silent,protect_content,redacted,proof,button],
     ))?;
     let id = transaction.last_insert_rowid();
     let text = delivery_text(&reply.text, event, id);

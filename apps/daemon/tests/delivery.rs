@@ -209,7 +209,7 @@ fn unsafe_database_files_and_future_schemas_are_rejected_without_replacement() {
     assert!(Store::open(dir.path(), "server-demo", "123456789").is_err());
     fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
     let connection = rusqlite::Connection::open(&path).unwrap();
-    connection.pragma_update(None, "user_version", 3).unwrap();
+    connection.pragma_update(None, "user_version", 99).unwrap();
     drop(connection);
     let before = fs::read(&path).unwrap();
     assert!(matches!(

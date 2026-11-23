@@ -2,7 +2,7 @@
 
 ## Русский
 
-`/status` доступен владельцу в личном чате. Снимок содержит время RFC 3339, CPU в процентах, число логических ядер, load за 1/5/15 минут и на ядро, RAM, место и inode выбранных файловых систем, состояние reboot-required. Объём памяти и диска показывается в MiB, inode в штуках. Неизвестное измерение содержит причину; оно не равно нулю.
+`/status` доступна владельцу в личном чате и пользователям с [разрешением `status.read`](telegram-access.md#настройка-доступа). Снимок содержит время RFC 3339, CPU в процентах, число логических ядер, load за 1/5/15 минут и на ядро, RAM, место и inode выбранных файловых систем, состояние reboot-required. Объём памяти и диска показывается в MiB, inode в штуках. Неизвестное измерение содержит причину; оно не равно нулю.
 
 Конфигурация `host_health` необязательна. Старые конфигурации используют следующие значения:
 
@@ -48,7 +48,7 @@ JSON содержит последний снимок, активные трев
 
 ## English
 
-`/status` is available to the owner in a private chat. It reports an RFC 3339 timestamp, CPU percentage, logical core count, 1/5/15-minute and per-core load, RAM, configured filesystem space and inode usage, and reboot-required status. Memory and disk sizes use MiB; inode values are counts. Unknown measurements carry a reason and never become zero.
+The owner can use `/status` in private. Other callers need the [`status.read` grant](telegram-access.md#set-up-access). It reports an RFC 3339 timestamp, CPU percentage, logical core count, 1/5/15-minute and per-core load, RAM, configured filesystem space and inode usage, and reboot-required status. Memory and disk sizes use MiB; inode values are counts. Unknown measurements carry a reason and never become zero.
 
 The optional `host_health` configuration defaults to the JSON above. Intervals range from 10 to 3600 seconds. Configure 1 to 8 unique absolute paths, each at most 512 bytes, without control characters or `..`. A path may identify a directory inside a filesystem. Mount discovery is explicit. If `/` is excluded, the compatibility field `root_disk` is unavailable; use the `disks` list for configured measurements.
 

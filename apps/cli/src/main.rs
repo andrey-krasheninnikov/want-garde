@@ -1,3 +1,5 @@
+mod access;
+
 use std::{path::Path, process::ExitCode};
 
 fn main() -> ExitCode {
@@ -22,7 +24,16 @@ fn main() -> ExitCode {
             "{}: want-garde [--lang LOCALE] owner bind --config PATH --user-id ID",
             garde_entrypoint::message(locale, "usage")
         );
+        println!("want-garde [--lang LOCALE] access [--config PATH] list|grant|revoke|group");
         return ExitCode::SUCCESS;
+    }
+    if let [command, rest @ ..] = args
+        && command == "access"
+    {
+        return match access::execute(rest, locale) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(code) => operation_failed(code, locale),
+        };
     }
     let result = match args {
         [owner, bind, config, path, user_id, id]
@@ -40,12 +51,16 @@ fn main() -> ExitCode {
             println!("{}", garde_entrypoint::message(locale, "owner_bound"));
             ExitCode::SUCCESS
         }
-        Err(code) => {
-            eprintln!(
-                "{code}: {}",
-                garde_entrypoint::message(locale, "operation_failed")
-            );
-            ExitCode::from(2)
-        }
+        Err(code) => operation_failed(code, locale),
     }
+}
+
+fn operation_failed(code: &'static str, locale: &str) -> ExitCode {
+    let key = match code {
+        "access.denied" => "access_denied",
+        "access.limit" => "access_limit",
+        _ => "operation_failed",
+    };
+    eprintln!("{code}: {}", garde_entrypoint::message(locale, key));
+    ExitCode::from(2)
 }

@@ -6,7 +6,7 @@ Want Garde сохраняет fail2ban Ban, Restore Ban и Unban, UFW BLOCK, с�
 
 ### Просмотр и диагностика
 
-Владельцу в личном чате доступны `/bans`, `/bans --page 2` и `/bans sshd 2`. Общая страница содержит до 10 jails, страница jail — до 20 IP. Снимок содержит время получения, текущие счётчики и явный признак неполноты. Неполный или недоступный снимок не означает отсутствие bans. Запросы групп, посторонних пользователей и callbacks не вызывают helper. Unban относится к #16.
+`/bans`, `/bans --page 2` и `/bans sshd 2` доступны владельцу в личном чате и пользователям с [разрешением `bans.read`](telegram-access.md#настройка-доступа). Общая страница содержит до 10 jails, страница jail — до 20 IP. Снимок содержит время получения, текущие счётчики и явный признак неполноты. Неполный или недоступный снимок не означает отсутствие bans. Демон вызывает helper после проверки доступа. Unban относится к #16.
 
 `/bans` также показывает здоровье обоих источников, пропуски, неподдержанные/повреждённые записи и стабильные reason keys. Локальная команда запускается от want-garde, не читает token и не меняет базу:
 
@@ -82,7 +82,7 @@ Want Garde persists fail2ban Ban, Restore Ban and Unban, UFW BLOCK, standard fir
 
 ### Reading and diagnostics
 
-The owner can use `/bans`, `/bans --page 2`, and `/bans sshd 2` in a private chat. A summary page contains up to 10 jails; a jail page contains up to 20 IPs. Snapshots include collection time, current counts and an explicit partial flag. Partial or unavailable data never means zero bans. Groups, unknown users and callbacks do not invoke the helper. Unban belongs to #16.
+The owner can use `/bans`, `/bans --page 2`, and `/bans sshd 2` in private. Other callers need the [`bans.read` grant](telegram-access.md#set-up-access). A summary page contains up to 10 jails; a jail page contains up to 20 IPs. Snapshots include collection time, current counts and an explicit partial flag. Partial or unavailable data never means zero bans. The daemon checks access before invoking the helper. Unban belongs to #16.
 
 `/bans` also exposes both sources, gaps, unsupported/malformed records and stable reason keys. Run `/usr/local/lib/want-garde/current/want-garde-daemon --firewall-status --config /etc/want-garde/config.json` as want-garde (for example with `sudo -u want-garde`); it reads JSON without the token or database writes. Exit codes are 0 for both sources healthy, 1 for incomplete/unavailable coverage, and 2 for configuration/database/diagnostic errors. A healthy reader proves neither firewall effectiveness nor observation of every blocked packet; source logging and rate limits constrain coverage.
 

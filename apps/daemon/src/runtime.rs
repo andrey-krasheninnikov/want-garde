@@ -1,6 +1,7 @@
 use crate::{
     Bot, Reply, StatusSource,
-    delivery::{Outcome, Store},
+    access::{self, Button},
+    delivery::{Delivery, Outcome, Store},
     host::LinuxHost,
     telegram::{FailureKind, Telegram, TransportError},
 };
@@ -22,6 +23,12 @@ pub struct Identity {
     pub id: String,
     pub username: String,
 }
+#[derive(Debug)]
+pub struct CallbackAck {
+    pub id: String,
+    pub text: Option<&'static str>,
+}
+
 pub trait Transport: Send + Sync + 'static {
     fn identity(
         &self,
@@ -34,6 +41,23 @@ pub trait Transport: Send + Sync + 'static {
         &self,
         reply: &Reply,
     ) -> impl Future<Output = std::result::Result<(), TransportError>> + Send;
+    fn send_access(
+        &self,
+        delivery: &Delivery,
+        database: &Database,
+    ) -> impl Future<Output = std::result::Result<(), TransportError>> + Send {
+        async {
+            Dispatch { delivery, database }.verify().await?;
+            self.send(&delivery.reply).await
+        }
+    }
+
+    fn answer_callback(
+        &self,
+        _ack: &CallbackAck,
+    ) -> impl Future<Output = std::result::Result<(), TransportError>> + Send {
+        async { Ok(()) }
+    }
 }
 
 type Work = Box<dyn FnOnce(&mut Store) + Send>;
@@ -96,6 +120,61 @@ impl Database {
     }
 }
 
+pub(crate) struct Dispatch<'a> {
+    pub delivery: &'a Delivery,
+    pub database: &'a Database,
+}
+
+impl Dispatch<'_> {
+    pub async fn verify(&self) -> std::result::Result<(), TransportError> {
+        let Some(protected) = &self.delivery.protected else {
+            return Err(TransportError::recipient("delivery.invalid"));
+        };
+        let proof = protected.proof;
+        let permitted = self
+            .database
+            .call(move |store| {
+                let transaction = crate::delivery::sql(store.connection.transaction())?;
+                let permitted = access::recheck(&transaction, proof, "delivery_allowed", now())?;
+                crate::delivery::sql(transaction.commit())?;
+                Ok(permitted)
+            })
+            .await
+            .map_err(access_storage_error)?;
+        if !permitted {
+            return Err(TransportError::recipient("access.changed"));
+        }
+        Ok(())
+    }
+
+    pub async fn button(&self) -> std::result::Result<Option<&Button>, TransportError> {
+        let Some(button) = self
+            .delivery
+            .protected
+            .as_ref()
+            .and_then(|reply| reply.button.as_ref())
+        else {
+            return Ok(None);
+        };
+        let token = button.token.clone();
+        let active = self
+            .database
+            .call(move |store| access::active_button(&store.connection, &token, now()))
+            .await
+            .map_err(access_storage_error)?;
+        Ok(active.then_some(button))
+    }
+}
+
+fn access_storage_error(code: &'static str) -> TransportError {
+    TransportError {
+        code,
+        kind: FailureKind::Retry,
+        uncertain: false,
+        retry_after: Duration::ZERO,
+    }
+}
+
 pub fn now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -151,7 +230,15 @@ pub async fn send_loop<T: Transport>(database: Database, transport: Arc<T>) -> R
                 break;
             };
             let transport = transport.clone();
-            tasks.spawn(async move { (delivery.id, transport.send(&delivery.reply).await) });
+            let database = database.clone();
+            tasks.spawn(async move {
+                let result = if delivery.protected.is_some() {
+                    transport.send_access(&delivery, &database).await
+                } else {
+                    transport.send(&delivery.reply).await
+                };
+                (delivery.id, result)
+            });
         }
     }
 }
@@ -207,16 +294,30 @@ async fn poll_loop<T: Transport>(
         updates.sort_by_key(|update| update["update_id"].as_i64().unwrap_or(-1));
         let mut failed = false;
         for update in updates {
-            if let Err(code) = bot
-                .process_update(&database, &update, source, username)
+            match bot
+                .process_update_and_ack(
+                    &database,
+                    &update,
+                    source,
+                    &crate::firewall::HelperClient,
+                    username,
+                )
                 .await
             {
-                if last_error != Some(code) {
-                    eprintln!("{code}");
-                    last_error = Some(code);
+                Ok((_, Some(ack))) => {
+                    if let Err(error) = transport.answer_callback(&ack).await {
+                        eprintln!("{}", error.code);
+                    }
                 }
-                failed = true;
-                break;
+                Ok((_, None)) => {}
+                Err(code) => {
+                    if last_error != Some(code) {
+                        eprintln!("{code}");
+                        last_error = Some(code);
+                    }
+                    failed = true;
+                    break;
+                }
             }
         }
         if failed {
@@ -277,7 +378,14 @@ pub async fn serve(config: Config) -> Result<()> {
         config.clone(),
         database.clone(),
     );
+    let access_database = database.clone();
     tokio::try_join!(
+        async {
+            if let Err(code) = crate::access_socket::run(&config, access_database).await {
+                eprintln!("{code}");
+            }
+            Ok(())
+        },
         crate::notification_policy::run(config.clone(), database.clone()),
         crate::geoip::run(config.clone(), database.clone()),
         host.run(&source),
