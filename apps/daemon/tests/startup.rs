@@ -15,6 +15,7 @@ fn delivery_diagnostics_are_read_only_json_and_work_without_a_token() {
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "en".into(),
         ssh: Default::default(),
         owner_user_id: Some("123456789".into()),

@@ -13,6 +13,8 @@ use std::{
 pub struct Store {
     pub(crate) connection: Connection,
     pub(crate) geoip_config: Option<garde_config::Config>,
+    pub(crate) retention: garde_config::Retention,
+    last_result_sweep: Option<i64>,
     _lock: File,
 }
 pub struct Delivery {
@@ -47,7 +49,7 @@ pub(crate) fn sql<T>(value: rusqlite::Result<T>) -> Result<T> {
     })
 }
 
-fn private_file(path: &Path) -> Result<()> {
+pub(crate) fn private_file(path: &Path) -> Result<()> {
     let m = fs::symlink_metadata(path).map_err(|_| "storage.permissions")?;
     if !m.is_file()
         || m.nlink() != 1
@@ -59,7 +61,7 @@ fn private_file(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn directory(path: &Path) -> Result<()> {
+pub(crate) fn directory(path: &Path) -> Result<()> {
     let m = fs::symlink_metadata(path).map_err(|_| "storage.permissions")?;
     if !m.is_dir() || m.mode() & 0o077 != 0 || m.uid() != rustix::process::geteuid().as_raw() {
         return Err("storage.permissions");
@@ -69,7 +71,19 @@ fn directory(path: &Path) -> Result<()> {
 
 impl Store {
     pub fn open(directory: &Path, server: &str, owner: &str) -> Result<Self> {
+        Self::open_with_retention(directory, server, owner, Default::default())
+    }
+
+    pub fn open_with_retention(
+        directory: &Path,
+        server: &str,
+        owner: &str,
+        retention: garde_config::Retention,
+    ) -> Result<Self> {
         Id::new(server)?;
+        if !retention.valid() {
+            return Err("config.invalid");
+        }
         if !garde_config::valid_user_id(owner) {
             return Err("storage.identity");
         }
@@ -136,7 +150,8 @@ impl Store {
             }
         }
         let pages: i64 = sql(connection.query_row("PRAGMA page_count", [], |r| r.get(0)))?;
-        if pages > 16384 {
+        let max_pages = i64::from(retention.database_mib) * 256;
+        if pages > max_pages {
             return Err("storage.quota");
         }
         if version == 1 {
@@ -148,7 +163,8 @@ impl Store {
                 sql(connection.prepare(query))?;
             }
         }
-        sql(connection.execute_batch("PRAGMA foreign_keys=ON; PRAGMA journal_mode=DELETE; PRAGMA synchronous=EXTRA; PRAGMA cache_size=-2048; PRAGMA max_page_count=16384;"))?;
+        sql(connection.execute_batch("PRAGMA foreign_keys=ON; PRAGMA journal_mode=DELETE; PRAGMA synchronous=EXTRA; PRAGMA cache_size=-2048;"))?;
+        sql(connection.pragma_update(None, "max_page_count", max_pages))?;
         if version == 0 {
             let transaction = sql(connection.transaction())?;
             sql(transaction.execute_batch("
@@ -208,9 +224,15 @@ impl Store {
         }
         sql(connection.execute("UPDATE deliveries SET state='pending',uncertain=1,last_error='delivery.uncertain' WHERE state='in_flight'",[]))?;
         crate::geoip::initialize(&connection)?;
+        crate::retention::initialize(&connection)?;
+        if let Err(code) = crate::retention::recover_result_writes(&directory) {
+            eprintln!("{code}");
+        }
         Ok(Self {
             geoip_config: None,
             connection,
+            retention,
+            last_result_sweep: None,
             _lock: lock,
         })
     }
@@ -280,6 +302,16 @@ impl Store {
     }
 
     pub fn consume_update(&mut self, id: i64, reply: Option<Reply>, now: i64) -> Result<i64> {
+        self.consume_update_with_reserve(id, reply, now, false)
+    }
+
+    pub(crate) fn consume_update_with_reserve(
+        &mut self,
+        id: i64,
+        reply: Option<Reply>,
+        now: i64,
+        health_reply: bool,
+    ) -> Result<i64> {
         if !(0..i64::MAX).contains(&id) {
             return Err("request.invalid");
         }
@@ -288,7 +320,7 @@ impl Store {
             return Ok(offset);
         }
         if reply.is_some() {
-            self.admit(1, now)?;
+            self.admit_with_reserve(1, now, health_reply)?;
         }
         let transaction = sql(self.connection.transaction())?;
         if let Some(reply) = reply {
@@ -568,7 +600,11 @@ impl Store {
             events.push(Some(payload));
         }
         // 512 endpoints can each contribute four old and new process records.
-        let limit = if key == "xui.state" { 2048 } else { 1024 };
+        let limit = if key == "xui.state" {
+            garde_config::MAX_OBSERVATION_BATCH
+        } else {
+            1024
+        };
         if publications.len() > limit || count > limit || now < 0 {
             return Err("event.invalid");
         }
@@ -684,32 +720,61 @@ impl Store {
         Ok((pages - free) * 4096)
     }
 
-    fn admit(&mut self, count: i64, now: i64) -> Result<()> {
+    pub(crate) fn admit(&mut self, count: i64, now: i64) -> Result<()> {
+        self.admit_with_reserve(count, now, false)
+    }
+
+    fn admit_with_reserve(&mut self, count: i64, now: i64, health_reply: bool) -> Result<()> {
         self.maintenance(now)?;
         let pending: i64 = sql(self.connection.query_row(
             "SELECT count(*) FROM deliveries WHERE state IN ('pending','in_flight')",
             [],
             |r| r.get(0),
         ))?;
-        if pending + count > 10000 || self.used_bytes()? >= 60 * 1024 * 1024 {
+        let limit = i64::from(self.retention.pending_deliveries) + i64::from(health_reply);
+        if (count > 0 && pending + count > limit)
+            || self.used_bytes()? as u64 >= crate::retention::database_soft_limit(self.retention)
+        {
             return Err("storage.quota");
         }
-        let space = rustix::fs::statvfs(self.connection.path().ok_or("storage.failed")?)
-            .map_err(|_| "storage.failed")?;
-        if u128::from(space.f_bavail) * u128::from(space.f_frsize) < 16 * 1024 * 1024 {
+        if crate::retention::free_bytes(Path::new(self.connection.path().ok_or("storage.failed")?))?
+            < crate::retention::disk_reserve(self.retention)
+        {
             return Err("storage.full");
         }
         Ok(())
     }
 
     fn maintenance(&mut self, now: i64) -> Result<()> {
-        let pressure = self.used_bytes()? >= 60 * 1024 * 1024;
+        if self
+            .last_result_sweep
+            .is_none_or(|last| now < last || now - last >= 60)
+        {
+            let state_dir = Path::new(self.connection.path().ok_or("storage.failed")?)
+                .parent()
+                .ok_or("storage.failed")?;
+            self.last_result_sweep = Some(now);
+            if let Err(code) = crate::retention::prune_results(state_dir, self.retention, now) {
+                eprintln!("{code}");
+            }
+        }
+        let pressure =
+            self.used_bytes()? as u64 >= crate::retention::database_soft_limit(self.retention);
+        let cutoff = now.saturating_sub(i64::from(self.retention.event_days) * 86400);
         let transaction = sql(self.connection.transaction())?;
         sql(transaction.execute("DELETE FROM cooldowns WHERE chat_id IN(SELECT chat_id FROM cooldowns WHERE until_at<=?1 LIMIT 16)",[now]))?;
-        let removed=sql(transaction.execute("DELETE FROM deliveries WHERE id IN (SELECT id FROM deliveries WHERE state IN ('delivered','dead_letter') AND (updated_at<?1 OR ?2 OR (SELECT count(*) FROM deliveries WHERE state IN ('delivered','dead_letter'))>10000) ORDER BY updated_at,id LIMIT 16)",params![now.saturating_sub(30*86400),pressure]))?;
-        let events=sql(transaction.execute("DELETE FROM events WHERE id IN (SELECT id FROM events e WHERE NOT EXISTS(SELECT 1 FROM deliveries d WHERE d.event_id=e.id) AND (created_at<?1 OR ?2 OR (SELECT count(*) FROM events)>20000) ORDER BY created_at,id LIMIT 16)",params![now.saturating_sub(30*86400),pressure]))?;
-        if removed + events > 0 {
-            sql(transaction.execute("UPDATE meta SET value=min(4294967295,CAST(value AS INTEGER)+?1) WHERE key='pruned'",[(removed+events) as i64]))?;
+        let removed = sql(transaction.execute(
+            "DELETE FROM deliveries WHERE id IN (
+            SELECT id FROM deliveries WHERE state IN ('delivered','dead_letter') AND
+            (updated_at<?1 OR ?2 OR
+            (SELECT count(*) FROM deliveries WHERE state IN ('delivered','dead_letter'))>10000)
+            ORDER BY updated_at,id LIMIT 16)",
+            params![cutoff, pressure],
+        ))?;
+        let events=sql(transaction.execute("DELETE FROM events WHERE id IN (SELECT id FROM events e WHERE NOT EXISTS(SELECT 1 FROM deliveries d WHERE d.event_id=e.id) AND (created_at<?1 OR ?2 OR (SELECT count(*) FROM events)>20000) ORDER BY created_at,id LIMIT 16)",params![cutoff,pressure]))?;
+        let audit = crate::retention::prune_audit(&transaction, self.retention, now, pressure)?;
+        if removed + events + audit > 0 {
+            sql(transaction.execute("UPDATE meta SET value=min(4294967295,CAST(value AS INTEGER)+?1) WHERE key='pruned'",[(removed+events+audit) as i64]))?;
         }
         sql(transaction.commit())
     }
@@ -857,7 +922,7 @@ fn timestamp(value: i64) -> Result<DateTime<Utc>> {
     DateTime::from_timestamp(value, 0).ok_or("storage.corrupt")
 }
 
-fn health(connection: &Connection, now: i64) -> Result<DeliveryHealth> {
+pub(crate) fn health(connection: &Connection, now: i64) -> Result<DeliveryHealth> {
     let count = |state| {
         sql(connection.query_row(
             "SELECT count(*) FROM deliveries WHERE state=?1",

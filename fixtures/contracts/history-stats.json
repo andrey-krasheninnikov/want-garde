@@ -1,0 +1,12 @@
+{
+  "version": "1",
+  "hours": 24,
+  "total": 1,
+  "groups": [
+    {
+      "source": "ssh",
+      "severity": "warning",
+      "count": 1
+    }
+  ]
+}

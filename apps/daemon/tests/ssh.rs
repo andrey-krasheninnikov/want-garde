@@ -29,6 +29,7 @@ async fn first_run_starts_at_tail_and_new_login_survives_restart_without_duplica
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "en".into(),
         ssh: SshConfig::File { path: log.clone() },
     };
@@ -72,6 +73,7 @@ async fn six_ssh_events_ignore_other_programs_and_do_not_copy_untrusted_log_tail
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "en".into(),
         ssh: SshConfig::File { path: log.clone() },
     };
@@ -136,6 +138,7 @@ async fn rotation_keeps_unread_and_late_old_file_records_across_restart() {
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "en".into(),
         ssh: SshConfig::File { path: log.clone() },
     };
@@ -189,6 +192,7 @@ async fn restart_recovers_intermediate_rotations_and_reports_uncertain_coverage(
             ports: Default::default(),
             xui: Default::default(),
             geoip: Default::default(),
+            retention: Default::default(),
             default_locale: "en".into(),
             ssh: SshConfig::File { path: log.clone() },
         };
@@ -261,6 +265,7 @@ async fn truncate_regrow_and_incomplete_or_oversized_records_leave_following_eve
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "en".into(),
         ssh: SshConfig::File { path: log.clone() },
     };
@@ -356,6 +361,7 @@ async fn journal_cursor_recovery_reports_gap_and_deduplicates_replay() {
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "en".into(),
         ssh: SshConfig::Journald {},
     };
@@ -426,6 +432,7 @@ async fn local_diagnostics_are_read_only_without_token_and_access_failure_remain
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "en".into(),
         ssh: SshConfig::File { path: log.clone() },
     };
@@ -477,6 +484,7 @@ async fn failed_checkpoint_commit_keeps_the_record_available_for_retry() {
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "en".into(),
         ssh: SshConfig::File { path: log.clone() },
     };
@@ -520,6 +528,7 @@ async fn repeated_failed_registration_does_not_keep_removed_log_files_open() {
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "en".into(),
         ssh: SshConfig::File { path: log.clone() },
     };
@@ -583,6 +592,7 @@ async fn an_unavailable_rotated_file_produces_a_persistent_gap_and_new_events_co
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "en".into(),
         ssh: SshConfig::File { path: log.clone() },
     };
@@ -627,6 +637,7 @@ async fn a_future_checkpoint_version_is_preserved_and_blocks_recovery_before_que
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "en".into(),
         ssh: SshConfig::File { path: log.clone() },
     };

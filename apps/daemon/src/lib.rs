@@ -8,11 +8,13 @@ use std::{fs, future::Future, path::PathBuf};
 pub mod delivery;
 pub mod firewall;
 pub mod geoip;
+pub mod history;
 pub mod host;
 pub mod host_health;
 pub mod ingest;
 pub mod listeners;
 mod observation;
+pub mod retention;
 pub mod runtime;
 pub mod services;
 pub mod ssh;
@@ -169,7 +171,28 @@ impl Bot {
         if id < offset {
             return Ok(offset);
         }
-        let reply = if let Some(("/geoip", args)) = self.command(update, username) {
+        let history = self
+            .command(update, username)
+            .and_then(|(command, args)| history::Query::parse(command.strip_prefix('/')?, &args));
+        let health_reply = matches!(history.as_ref(), Some(Ok(history::Query::Health)));
+        let reply = if let Some(query) = history {
+            let text = match query
+                .and_then(|query| history::inspect(&self.config, query, runtime::now()))
+            {
+                Ok(output) => output.render(&self.locale),
+                Err("request.invalid") => message(&self.locale, "history_usage").to_owned(),
+                Err("history.not_found") => message(&self.locale, "history_not_found").to_owned(),
+                Err(code) => {
+                    eprintln!("{code}");
+                    message(&self.locale, "operation_failed").to_owned()
+                }
+            };
+            Some(Reply {
+                locale: None,
+                chat_id: self.config.owner()?.into(),
+                text,
+            })
+        } else if let Some(("/geoip", args)) = self.command(update, username) {
             let text = match args.as_slice() {
                 [] => {
                     let health = database.call(|s| s.geoip_health(runtime::now())).await?;
@@ -289,7 +312,9 @@ impl Bot {
             }
         };
         database
-            .call(move |store| store.consume_update(id, reply, runtime::now()))
+            .call(move |store| {
+                store.consume_update_with_reserve(id, reply, runtime::now(), health_reply)
+            })
             .await
     }
 

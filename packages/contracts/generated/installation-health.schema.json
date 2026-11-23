@@ -1,0 +1,285 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InstallationHealth",
+  "type": "object",
+  "properties": {
+    "degraded": {
+      "type": "boolean"
+    },
+    "delivery": {
+      "$ref": "#/$defs/DeliveryHealth"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SourceReport"
+      }
+    },
+    "storage": {
+      "$ref": "#/$defs/StorageReport"
+    },
+    "version": {
+      "$ref": "#/$defs/WireVersion"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "degraded",
+    "sources",
+    "delivery",
+    "storage"
+  ],
+  "$defs": {
+    "DeliveryHealth": {
+      "type": "object",
+      "properties": {
+        "dead_letter": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "delivered": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "in_flight": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "oldest_pending_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "pending": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "problems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DeliveryProblem"
+          }
+        },
+        "pruned_records": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "rate_limited": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "server_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "version": {
+          "$ref": "#/$defs/WireVersion"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "server_id",
+        "observed_at",
+        "pending",
+        "in_flight",
+        "delivered",
+        "dead_letter",
+        "rate_limited",
+        "pruned_records",
+        "problems"
+      ]
+    },
+    "DeliveryProblem": {
+      "type": "object",
+      "properties": {
+        "attempts": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "delivery_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "event_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason_key": {
+          "$ref": "#/$defs/Id"
+        },
+        "state": {
+          "$ref": "#/$defs/DeliveryState"
+        },
+        "uncertain": {
+          "type": "boolean"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "delivery_id",
+        "state",
+        "attempts",
+        "reason_key",
+        "uncertain",
+        "updated_at"
+      ]
+    },
+    "DeliveryState": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "in_flight",
+        "delivered",
+        "dead_letter"
+      ]
+    },
+    "Id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "SourceReport": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "gaps": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "healthy": {
+          "type": "boolean"
+        },
+        "last_gap_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "reason_key": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/Id"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "enabled",
+        "healthy",
+        "gaps"
+      ]
+    },
+    "StorageReport": {
+      "type": "object",
+      "properties": {
+        "action_audit_records": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "backpressure": {
+          "type": "boolean"
+        },
+        "database_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "database_limit_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "free_disk_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "occupied_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "pending_limit": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "process_audit_records": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "result_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "result_count": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "result_limit_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "database_bytes",
+        "database_limit_bytes",
+        "occupied_bytes",
+        "free_disk_bytes",
+        "pending_limit",
+        "result_bytes",
+        "result_limit_bytes",
+        "result_count",
+        "action_audit_records",
+        "process_audit_records",
+        "backpressure"
+      ]
+    },
+    "WireVersion": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    }
+  }
+}

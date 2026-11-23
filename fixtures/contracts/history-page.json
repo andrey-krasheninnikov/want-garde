@@ -1,0 +1,13 @@
+{
+  "version": "1",
+  "events": [
+    {
+      "id": "event-001",
+      "source": "ssh",
+      "observed_at": "2026-01-01T00:00:00Z",
+      "severity": "warning",
+      "reason_key": "ssh.authentication_failed"
+    }
+  ],
+  "next_cursor": null
+}

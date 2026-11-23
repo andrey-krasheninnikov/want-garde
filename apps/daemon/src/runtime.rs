@@ -46,10 +46,11 @@ impl Database {
         std::thread::Builder::new()
             .name("garde-storage".into())
             .spawn(move || {
-                let mut store = match Store::open(
+                let mut store = match Store::open_with_retention(
                     &config.state_dir,
                     config.server_id.as_str(),
                     config.owner().unwrap_or(""),
+                    config.retention,
                 ) {
                     Ok(store) => store,
                     Err(code) => {

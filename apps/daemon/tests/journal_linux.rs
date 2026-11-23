@@ -41,6 +41,7 @@ async fn native_journal_tail_restart_and_missing_cursor() {
         ports: Default::default(),
         xui: Default::default(),
         geoip: Default::default(),
+        retention: Default::default(),
         default_locale: "en".into(),
         ssh: SshConfig::Journald {},
     };
