@@ -229,7 +229,10 @@ impl Transport for Telegram {
         {
             return Err(TransportError::transient("telegram.response"));
         }
-        if forum && result["message_thread_id"].as_i64() != topic_id.map(i64::from) {
+        if forum
+            && (result["chat"]["is_forum"] != true
+                || result["message_thread_id"].as_i64() != topic_id.map(i64::from))
+        {
             return Err(TransportError::recipient("telegram.forum_response"));
         }
         Ok(())
@@ -390,12 +393,12 @@ mod tests {
             (200, forum_chat(true)),
             (
                 200,
-                json!({"ok":true,"result":{"message_id":1,"chat":{"id":-1001234567890_i64},"message_thread_id":42}}),
+                json!({"ok":true,"result":{"message_id":1,"chat":{"id":-1001234567890_i64,"is_forum":true},"message_thread_id":42}}),
             ),
             (200, forum_chat(true)),
             (
                 200,
-                json!({"ok":true,"result":{"message_id":2,"chat":{"id":-1001234567890_i64}}}),
+                json!({"ok":true,"result":{"message_id":2,"chat":{"id":-1001234567890_i64,"is_forum":true}}}),
             ),
         ]);
         api.send(&forum_reply(Some(42))).await.unwrap();
@@ -460,7 +463,7 @@ mod tests {
 
     #[tokio::test]
     async fn successful_send_to_the_wrong_thread_is_terminal_but_incomplete_ack_can_retry() {
-        let chat = json!({"id":-1001234567890_i64});
+        let chat = json!({"id":-1001234567890_i64,"is_forum":true});
         for (result, kind, code) in [
             (
                 json!({"message_id":1,"chat":chat,"message_thread_id":43}),
@@ -488,6 +491,27 @@ mod tests {
             assert_eq!(error.uncertain, kind == FailureKind::Retry);
             assert_eq!(worker.join().unwrap()[1].1["message_thread_id"], 42);
         }
+    }
+
+    #[tokio::test]
+    async fn general_acknowledgement_from_a_chat_that_disabled_topics_is_terminal() {
+        let (api, worker) = server(vec![
+            (200, forum_chat(true)),
+            (
+                200,
+                json!({"ok":true,"result":{"message_id":4,"chat":{"id":-1001234567890_i64,"type":"supergroup"}}}),
+            ),
+        ]);
+        let error = api.send(&forum_reply(None)).await.unwrap_err();
+        assert_eq!(error.kind, FailureKind::Recipient);
+        assert_eq!(error.code, "telegram.forum_response");
+        assert!(!error.uncertain);
+        assert!(
+            worker.join().unwrap()[1]
+                .1
+                .get("message_thread_id")
+                .is_none()
+        );
     }
 
     #[tokio::test]
